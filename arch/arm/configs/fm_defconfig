@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35.14
-# Fri Nov 11 20:12:22 2011
+# Mon Nov 14 19:56:32 2011
 #
 CONFIG_ARM=y
 CONFIG_HAVE_PWM=y
@@ -86,7 +86,7 @@ CONFIG_RT_GROUP_SCHED=y
 # CONFIG_RELAY is not set
 # CONFIG_NAMESPACES is not set
 CONFIG_BLK_DEV_INITRD=y
-CONFIG_INITRAMFS_SOURCE="/home/frank_m/android-sdk-linux_x86/Samsung/N7000/init/initramfs_own"
+CONFIG_INITRAMFS_SOURCE="./initramfs_own"
 CONFIG_INITRAMFS_ROOT_UID=0
 CONFIG_INITRAMFS_ROOT_GID=0
 # CONFIG_RD_GZIP is not set
