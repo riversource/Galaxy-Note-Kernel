@@ -254,6 +254,7 @@ static mali_physical_memory_allocation_result os_allocator_allocate_page_table_b
 		} else {
 			/* return OOM */
 			_mali_osk_lock_signal(info->mutex, _MALI_OSK_LOCKMODE_RW);
+			MALI_PRINT(("Failed to allocate consistent memory in all sizes.\n"));
 			return MALI_MEM_ALLOC_NONE;
 		}
 	}
@@ -273,12 +274,15 @@ static mali_physical_memory_allocation_result os_allocator_allocate_page_table_b
 	if ( NULL == virt )
 	{
 		MALI_DEBUG_PRINT(1, ("Failed to allocate consistent memory. Is CONSISTENT_DMA_SIZE set too low?\n"));
+		MALI_PRINT(("Failed to allocate consistent memory. Is CONSISTENT_DMA_SIZE set too low?\n"));
 		/* return OOM */
 		_mali_osk_lock_signal(info->mutex, _MALI_OSK_LOCKMODE_RW);
 		return MALI_MEM_ALLOC_NONE;
 	}
 
 	MALI_DEBUG_PRINT(5, ("os_allocator_allocate_page_table_block: Allocation of order %i succeeded\n",
+				allocation_order));
+	MALI_PRINT(("os_allocator_allocate_page_table_block: Allocation of order %i succeeded\n",
 				allocation_order));
 
 	/* we now know the size of the allocation since we know for what

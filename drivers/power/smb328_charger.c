@@ -823,12 +823,20 @@ static int smb328_probe(struct i2c_client *client, const struct i2c_device_id *i
 	int ret = 0;
 	int gpio = 0;
 	u8 data;
+	int i;
 
-	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE))
-		return -EIO;
+	i = 10;
+	while (1) {
+		if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE))
+			goto I2CERROR;
 
-	if (smb328_i2c_read(client, 0x36, &data)<0)	/* check HW */
-		return -EIO;
+		if (smb328_i2c_read(client, 0x36, &data)>=0)	/* check HW */
+			break;
+
+I2CERROR:
+		if (!i--) return -EIO;
+		msleep(300);
+	}
 
 	dev_info(&client->dev, "%s : SMB328 Charger Driver Loading\n", __func__);
 

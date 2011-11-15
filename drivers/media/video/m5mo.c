@@ -1710,7 +1710,7 @@ static int m5mo_set_af_mode_select(struct v4l2_subdev *sd)
 static int m5mo_set_touch_auto_focus(struct v4l2_subdev *sd, int val)
 {
 	struct m5mo_state *state = to_state(sd);
-	int err = -EINVAL;
+	int err; 
 	cam_info("%s\n", val ? "start" : "stop");
 
 	state->focus.touch = val;
@@ -1730,7 +1730,7 @@ static int m5mo_set_touch_auto_focus(struct v4l2_subdev *sd, int val)
 	}
 
 	cam_trace("X\n");
-	return err;
+	return 0;
 }
 
 static int m5mo_set_zoom(struct v4l2_subdev *sd, struct v4l2_control *ctrl)
