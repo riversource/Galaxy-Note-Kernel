@@ -17,7 +17,7 @@ then
 # Superuser
     toolbox rm /system/app/Superuser.apk
     toolbox rm /data/app/Superuser.apk
-    toolbox cat /res/misc/Superuser.apk > /system/xbin/Superuser.apk
+    toolbox cat /res/misc/Superuser.apk > /system/app/Superuser.apk
 #    /sbin/ext/busybox dd if=/dev/block/mmcblk0p5 of=/system/app/Superuser.apk skip=7000000 seek=0 bs=1 count=762010
     toolbox chown 0.0 /system/app/Superuser.apk
     toolbox chmod 644 /system/app/Superuser.apk
