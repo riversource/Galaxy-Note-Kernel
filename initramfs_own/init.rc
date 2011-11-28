@@ -27,6 +27,9 @@ loglevel 3
 # Disable CFQ slice idle delay
     write /sys/block/mmcblk0/queue/iosched/slice_idle 0
 
+# Set readahead to 4096
+    write /sys/block/mmcblk0/queue/iosched/read_ahead_kb 4096
+
 # Backward compatibility
     symlink /system/etc /etc
     symlink /sys/kernel/debug /d
@@ -429,6 +432,8 @@ on boot
     # Tweak background writeout
     write /proc/sys/vm/dirty_expire_centisecs 200
     write /proc/sys/vm/dirty_background_ratio  5
+    write /sys/devices/system/cpu/cpufreq/ondemand/deep_sleep 1
+    write /sys/devices/system/cpu/cpufreq/ondemand/fast_start 1
     write /sys/class/mdnieset_ui/switch_mdnieset_ui/mdnieset_init_file_cmd  0
 
 # permissions for NFC
