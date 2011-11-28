@@ -1279,7 +1279,7 @@ static struct usb_mass_storage_platform_data ums_pdata = {
 	.product		= "UMS Composite",//"SMDKV210",
 #endif
 	.release		= 1,
-	.nluns			= 1,
+	.nluns			= 2,
 };
 struct platform_device s3c_device_usb_mass_storage= {
 	.name	= "usb_mass_storage",

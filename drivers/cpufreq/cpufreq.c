@@ -28,6 +28,8 @@
 #include <linux/cpu.h>
 #include <linux/completion.h>
 #include <linux/mutex.h>
+#include <linux/earlysuspend.h>
+
 
 #define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_CORE, \
 						"cpufreq-core", msg)
@@ -647,6 +649,20 @@ static ssize_t show_scaling_setspeed(struct cpufreq_policy *policy, char *buf)
 	return policy->governor->show_setspeed(policy, buf);
 }
 
+/* sysfs interface for UV control */
+extern ssize_t show_UV_mV_table(struct cpufreq_policy *policy, char *buf);
+extern ssize_t store_UV_mV_table(struct cpufreq_policy *policy,
+                                      const char *buf, size_t count);
+/* sysfs interface for frequency control */
+extern ssize_t show_freq_table(struct cpufreq_policy *policy, char *buf);
+extern ssize_t store_freq_table(struct cpufreq_policy *policy,
+                                      const char *buf, size_t count);
+/* sysfs interface for bus frequency control */
+extern ssize_t show_busfreq_static(struct cpufreq_policy *policy, char *buf);
+extern ssize_t store_busfreq_static(struct cpufreq_policy *policy,
+                                      const char *buf, size_t count);
+extern ssize_t show_cpu_class(struct cpufreq_policy *policy, char *buf);
+
 /**
  * show_scaling_driver - show the current cpufreq HW/BIOS limitation
  */
@@ -676,6 +692,14 @@ cpufreq_freq_attr_rw(scaling_min_freq);
 cpufreq_freq_attr_rw(scaling_max_freq);
 cpufreq_freq_attr_rw(scaling_governor);
 cpufreq_freq_attr_rw(scaling_setspeed);
+/* UV table */
+cpufreq_freq_attr_rw(UV_mV_table);
+/* freq table */
+cpufreq_freq_attr_rw(freq_table);
+/* busfreq_static_level */
+cpufreq_freq_attr_rw(busfreq_static);
+//cpu class
+cpufreq_freq_attr_ro(cpu_class);
 
 static struct attribute *default_attrs[] = {
 	&cpuinfo_min_freq.attr,
@@ -689,6 +713,10 @@ static struct attribute *default_attrs[] = {
 	&scaling_driver.attr,
 	&scaling_available_governors.attr,
 	&scaling_setspeed.attr,
+	&UV_mV_table.attr,
+	&freq_table.attr,
+	&busfreq_static.attr,
+	&cpu_class.attr,
 	NULL
 };
 
@@ -703,10 +731,6 @@ static ssize_t show(struct kobject *kobj, struct attribute *attr, char *buf)
 	struct cpufreq_policy *policy = to_policy(kobj);
 	struct freq_attr *fattr = to_attr(attr);
 	ssize_t ret = -EINVAL;
-
-	if (!policy)
-		goto no_policy;
-
 	policy = cpufreq_cpu_get(policy->cpu);
 	if (!policy)
 		goto no_policy;
@@ -732,10 +756,6 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
 	struct cpufreq_policy *policy = to_policy(kobj);
 	struct freq_attr *fattr = to_attr(attr);
 	ssize_t ret = -EINVAL;
-
-	if (!policy)
-		goto no_policy;
-
 	policy = cpufreq_cpu_get(policy->cpu);
 	if (!policy)
 		goto no_policy;
@@ -1045,6 +1065,17 @@ static int cpufreq_add_dev(struct sys_device *sys_dev)
 		dprintk("initialization failed\n");
 		goto err_unlock_policy;
 	}
+#ifdef CONFIG_HOTPLUG_CPU
+	for_each_online_cpu(sibling) {
+		struct cpufreq_policy *cp = per_cpu(cpufreq_cpu_data, sibling);
+		if (cp && cp->governor &&
+		    (cpumask_test_cpu(cpu, cp->related_cpus))) {
+			policy->min = cp->min;
+			policy->max = cp->max;
+			break;
+		}
+	}
+#endif
 	policy->user_policy.min = policy->min;
 	policy->user_policy.max = policy->max;
 
@@ -1660,6 +1691,16 @@ int cpufreq_register_governor(struct cpufreq_governor *governor)
 	err = -EBUSY;
 	if (__find_governor(governor->name) == NULL) {
 		err = 0;
+		if (!strncmp(governor->name, "smartassV2", CPUFREQ_NAME_LEN)
+		|| !strncmp(governor->name, "smartass", CPUFREQ_NAME_LEN)
+		|| !strncmp(governor->name, "ondemand", CPUFREQ_NAME_LEN)
+		|| !strncmp(governor->name, "interactive", CPUFREQ_NAME_LEN)
+		|| !strncmp(governor->name, "interactiveX", CPUFREQ_NAME_LEN)
+		|| !strncmp(governor->name, "ondemandx", CPUFREQ_NAME_LEN)
+		|| !strncmp(governor->name, "conservative", CPUFREQ_NAME_LEN))
+			governor->disableScalingDuringSuspend = 1;
+		else
+			governor->disableScalingDuringSuspend = 0;
 		list_add(&governor->governor_list, &cpufreq_governor_list);
 	}
 

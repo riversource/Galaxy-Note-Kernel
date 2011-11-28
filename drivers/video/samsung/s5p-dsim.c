@@ -118,7 +118,7 @@ static DECLARE_COMPLETION(dsim_wr_comp);
 
 #define MIPI_CMD_DSI_SET_PKT_SZ		0x37
 
-#define MIPI_RX_TIMEOUT			msecs_to_jiffies(250)
+#define MIPI_RX_TIMEOUT			HZ
 #define DSMI_RX_FIFO_READ_DONE		0x30800002
 #define DSIM_MAX_RX_FIFO			20
 
@@ -361,7 +361,7 @@ int s5p_dsim_rd_data(unsigned int reg_base, u8 addr, u16 count, u8 *buf)
 	printk("rxhd : %x\n", rxhd);
 	if ((u8)(rxhd & 0xff) != response) {
 		printk(KERN_ERR "[DSIM:ERROR]:%s wrong response rxhd : %x, response:%x\n"
-		    , __func__, rxhd, response);
+		    ,__func__, rxhd, response);
 		goto clear_rx_fifo;
 	}
 	// for short packet
@@ -382,7 +382,7 @@ int s5p_dsim_rd_data(unsigned int reg_base, u8 addr, u16 count, u8 *buf)
 		for (i = 0; i < rxsize>>2; i++) {
 			temp = readl(reg_base + S5P_DSIM_RXFIFO);
 			printk("pkt : %08x\n", temp);
-			for (j = 0; j < 4; j++) {
+			for(j=0; j < 4; j++) {
 				buf[(i*4)+j] = (u8)(temp>>(j*8))&0xff;
 				//printk("Value : %02x\n",(temp>>(j*8))&0xff);
 			}
@@ -390,7 +390,7 @@ int s5p_dsim_rd_data(unsigned int reg_base, u8 addr, u16 count, u8 *buf)
 		if (rxsize % 4) {
 			temp = readl(reg_base + S5P_DSIM_RXFIFO);
 			printk("pkt-l : %08x\n", temp);
-			for (j = 0; j < rxsize%4; j++) {
+			for(j=0; j < rxsize%4; j++) {
 				buf[(i*4)+j] = (u8)(temp>>(j*8))&0xff;
 				//printk("Value : %02x\n",(temp>>(j*8))&0xff);
 			}
@@ -1092,24 +1092,24 @@ void s5p_dsim_interrupt_mask_set(void)
 
 int s5p_dsim_fifo_clear(void)
 {
-	int dsim_count = 0, ret;
+	int dsim_count=0,ret;
 
 	writel(SwRstRelease, dsim.reg_base + S5P_DSIM_INTSRC);
-
+	
 	writel(DSIM_FUNCRST, dsim.reg_base + S5P_DSIM_SWRST);
-	do {
-		if (++dsim_count > 90000) {
-			printk("dsim fifo clear fail re_try dsim resume\n");
-			ret = 0;
+	do{
+		if(++dsim_count>90000){
+			printk("dsim fifo clear fail re_try dsim resume\n");			
+			ret=0;
+			break;
+		}			
+		
+		if(readl(dsim.reg_base + S5P_DSIM_INTSRC) & SwRstRelease){
+			s5p_dsim_interrupt_mask_set();			
+			ret=1;
 			break;
 		}
-
-		if (readl(dsim.reg_base + S5P_DSIM_INTSRC) & SwRstRelease) {
-			s5p_dsim_interrupt_mask_set();
-			ret = 1;
-			break;
-		}
-	} while (1);
+	}while(1);	
 
 	return ret;
 }
@@ -1143,18 +1143,18 @@ void s5p_dsim_early_suspend(void)
 
 	if (dsim.mipi_ddi_pd->lcd_power_on)
 		dsim.mipi_ddi_pd->lcd_power_on(dsim.dev, 0);
-
+	
 	s5p_dsim_enable_hs_clock(dsim.reg_base, 0);
 	s5p_dsim_set_clock(dsim.reg_base, dsim.dsim_info->e_byte_clk, 0);
-
+	
 	writel(0xffff, dsim.reg_base + S5P_DSIM_CLKCTRL);
 	writel(0x0, dsim.reg_base + S5P_DSIM_PLLCTRL);
 	writel(0x0, dsim.reg_base + S5P_DSIM_PLLTMR);
 	writel(0x0, dsim.reg_base + S5P_DSIM_PHYACCHR);
-	writel(0x0, dsim.reg_base + S5P_DSIM_PHYACCHR1);
+	writel(0x0, dsim.reg_base + S5P_DSIM_PHYACCHR1);  
 
 	writel(0x1, dsim.reg_base + S5P_DSIM_SWRST);
-
+	
 	clk_disable(dsim.clock);
 
 #if 0

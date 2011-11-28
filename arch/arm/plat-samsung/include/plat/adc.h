@@ -46,6 +46,6 @@ struct s3c_adc_mach_info
     int resolution;
 };
 
-extern void __init s3c_adc_set_platdata(struct s3c_adc_mach_info *pd);
+extern void s3c_adc_set_platdata(struct s3c_adc_mach_info *pd);
 
 #endif /* __ASM_PLAT_ADC_H */

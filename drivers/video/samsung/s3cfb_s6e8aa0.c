@@ -1012,21 +1012,13 @@ int s6e8aa0_read_id(struct lcd_info *lcd)
 int s6e8ax0_read_mtp(struct lcd_info *lcd, u8 *mtp_data)
 {
 	int ret;
-	u8 retry_cnt = 3;
 
 	s6e8ax0_write(lcd, enable_mtp_register, ARRAY_SIZE(enable_mtp_register));
-
-read_retry:
 	ret = s6e8ax0_read(lcd, LDI_MTP_ADDR, LDI_MTP_LENGTH, mtp_data);
 	if (!ret) {
-		if (retry_cnt) {
-			printk("[WARN:LCD] : %s : retry cnt : %d\n", __func__, retry_cnt);
-			retry_cnt--;
-			goto read_retry;
-		} else
-			printk("ERROR:MTP read failed\n");
+		printk("ERROR:MTP read failed\n");
+		return 0;
 	}
-
 	s6e8ax0_write(lcd, disable_mtp_register, ARRAY_SIZE(disable_mtp_register));
 	return ret;
 }
@@ -1239,7 +1231,6 @@ static int s6e8ax0_probe(struct device *dev)
 	u8 mtp_data[LDI_MTP_LENGTH] = {0,};
 	u32 i;
 	u8 id_buf[3] = {0,};
-	u8 retry_cnt = 3;
 #endif
 
 	lcd = kzalloc(sizeof(struct lcd_info), GFP_KERNEL);
@@ -1342,18 +1333,11 @@ static int s6e8ax0_probe(struct device *dev)
 #ifdef SMART_DIMMING
 	mutex_init(&lcd->bl_lock);
 
-read_retry:
+	//read mpt
 	ret = s6e8ax0_read(lcd, PANEL_ID_COMMAND, 3, id_buf);
 	if (!ret) {
-		if (retry_cnt) {
-			printk("[WARN:LCD] : %s : retry cnt : %d\n", __func__, retry_cnt);
-			retry_cnt--;
-			goto read_retry;
-		} else {
-			printk("[ERROR:LCD] : %s : Read ID Failed\n", __func__);
-			/*To protect ELVSS Wrong Operation*/
-			id_buf[2] = 0x33;
-		}
+		printk("[LCD:ERROR] : %s read id failed\n", __func__);
+		//return -1;
 	}
 
 	printk("Read ID : %x, %x, %x\n", id_buf[0], id_buf[1], id_buf[2]);
@@ -1380,9 +1364,7 @@ read_retry:
 	ret = s6e8ax0_read_mtp(lcd, mtp_data);
 	if (!ret) {
 		printk("[LCD:ERROR] : %s read mtp failed\n", __func__);
-		lcd->connected = 0;
-		dev_info(&lcd->ld->dev, "panel is not connected well\n");
-		/*return -1;*/
+		//return -1;
 	}
 
 	calc_voltage_table(&lcd->smart, mtp_data);
@@ -1390,7 +1372,8 @@ read_retry:
 	s6e8ax0_adb_brightness_update(lcd, lcd->bd->props.brightness, 1);
 #endif
 
-	if (lcd->connected) {
+	if (id_buf[0] == 0xa2) {
+		lcd->connected = 1;
 		INIT_DELAYED_WORK(&hs_clk_re_try, hs_clk_re_try_work);
 
 		lcd->irq = gpio_to_irq(GPIO_OLED_DET);
@@ -1404,6 +1387,9 @@ read_retry:
 			ret = -EINVAL;
 			goto out_free_backlight;
 		}
+	} else {
+		lcd->connected = 0;
+		dev_info(&lcd->ld->dev, "panel is not connected\n");
 	}
 
 	return 0;

@@ -82,6 +82,10 @@
 #include <asm/smp.h>
 #endif
 
+#ifdef CONFIG_KERNEL_DEBUG_SEC
+#include <linux/kernel_sec_common.h>
+#endif
+
 static int kernel_init(void *);
 
 extern void init_IRQ(void);
@@ -706,6 +710,10 @@ asmlinkage void __init start_kernel(void)
 
 	ftrace_init();
 
+#ifdef CONFIG_KERNEL_DEBUG_SEC
+        kernel_sec_init();
+#endif
+
 	/* Do the rest non-__init'ed, we're now alive */
 	rest_init();
 }
@@ -731,7 +739,7 @@ static struct boot_trace_ret ret;
 int do_one_initcall(initcall_t fn)
 {
 	int count = preempt_count();
-	ktime_t calltime, delta, rettime;
+	ktime_t calltime = { .tv64 = 0 }, delta, rettime;
 
 	if (initcall_debug) {
 		call.caller = task_pid_nr(current);

@@ -294,7 +294,7 @@ static irqreturn_t s5p_cec_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static int __init s5p_cec_probe(struct platform_device *pdev)
+static int s5p_cec_probe(struct platform_device *pdev)
 {
 	struct s5p_platform_cec *pdata;
 	u8 *buffer;

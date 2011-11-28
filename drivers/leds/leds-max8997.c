@@ -245,16 +245,6 @@ static int __devexit regulator_led_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static void regulator_led_shutdown(struct platform_device *pdev)
-{
-	struct regulator_led *led = platform_get_drvdata(pdev);
-
-	if (regulator_is_enabled(led->vcc)) {
-		regulator_led_disable(led);
-	}
-	return;
-}
-
 static struct platform_driver regulator_led_driver = {
 	.driver = {
 		   .name  = "leds-max8997",
@@ -262,7 +252,6 @@ static struct platform_driver regulator_led_driver = {
 		   },
 	.probe  = regulator_led_probe,
 	.remove = __devexit_p(regulator_led_remove),
-	.shutdown = regulator_led_shutdown,
 };
 
 static int __init regulator_led_init(void)

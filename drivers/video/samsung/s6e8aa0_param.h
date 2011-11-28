@@ -69,8 +69,7 @@ static const unsigned char SEQ_APPLY_LEVEL_2_KEY[] = {
 };
 
 static const unsigned char SEQ_SLEEP_OUT[] = {
-	0x11,
-	0x00,0x00	
+	0x11
 };
 
 static const unsigned char SEQ_PANEL_CONDITION_SET[] = {
@@ -87,8 +86,7 @@ static const unsigned char SEQ_DISPLAY_CONDITION_SET[] = {
 };
 
 static const unsigned char SEQ_GAMMA_UPDATE[] = {
-	0xF7, 0x03,
-	0x00		
+	0xF7, 0x03
 };
 
 static const unsigned char SEQ_ETC_SOURCE_CONTROL[] = {
@@ -121,29 +119,24 @@ static const unsigned char SEQ_ELVSS_NVM_SETTING[] = {
 };
 
 static const unsigned char SEQ_DISPLAY_ON[] = {
-	0x29,
-	0x00,0x00	
+	0x29
 };
 
 static const unsigned char SEQ_DISPLAY_OFF[] = {
-	0x28,
-	0x00,0x00		
+	0x28
 };
 
 static const unsigned char SEQ_STANDBY_ON[] = {
-	0x01,
-	0x00,0x00		
+	0x01
 };
 
 
 static const unsigned char SEQ_ACL_ON[] = {
 	0xC0, 0x01,
-	0x00		
 };
 
 static const unsigned char SEQ_ACL_OFF[] = {
 	0xC0, 0x00,
-	0x00		
 };
 
 static const unsigned char SEQ_ACL_CUTOFF_20[] = {

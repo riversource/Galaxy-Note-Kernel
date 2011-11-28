@@ -2033,7 +2033,7 @@ static irqreturn_t s5p_ace_interrupt(int irq, void *data)
 }
 #endif
 
-static int __init s5p_ace_probe(struct platform_device *pdev)
+static int s5p_ace_probe(struct platform_device *pdev)
 {
 	struct resource *res;
 	struct s5p_ace_device *s5p_adt = &s5p_ace_dev;

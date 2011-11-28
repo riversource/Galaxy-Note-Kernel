@@ -150,7 +150,7 @@ struct kobject *power_kobj;
  *	'standby' (Power-On Suspend), 'mem' (Suspend-to-RAM), and
  *	'disk' (Suspend-to-Disk).
  *
- *	store() accepts one of those strings, translates it into the
+ *	store() accepts one of those strings, translates it into the 
  *	proper enumerated value, and initiates a suspend transition.
  */
 static ssize_t state_show(struct kobject *kobj, struct kobj_attribute *attr,
@@ -162,7 +162,7 @@ static ssize_t state_show(struct kobject *kobj, struct kobj_attribute *attr,
 
 	for (i = 0; i < PM_SUSPEND_MAX; i++) {
 		if (pm_states[i] && valid_state(i))
-			s += sprintf(s, "%s ", pm_states[i]);
+			s += sprintf(s,"%s ", pm_states[i]);
 	}
 #endif
 #ifdef CONFIG_HIBERNATION
@@ -221,6 +221,60 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 power_attr(state);
 
+#ifdef CONFIG_PM_SLEEP
+/*
+ * The 'wakeup_count' attribute, along with the functions defined in
+ * drivers/base/power/wakeup.c, provides a means by which wakeup events can be
+ * handled in a non-racy way.
+ *
+ * If a wakeup event occurs when the system is in a sleep state, it simply is
+ * woken up.  In turn, if an event that would wake the system up from a sleep
+ * state occurs when it is undergoing a transition to that sleep state, the
+ * transition should be aborted.  Moreover, if such an event occurs when the
+ * system is in the working state, an attempt to start a transition to the
+ * given sleep state should fail during certain period after the detection of
+ * the event.  Using the 'state' attribute alone is not sufficient to satisfy
+ * these requirements, because a wakeup event may occur exactly when 'state'
+ * is being written to and may be delivered to user space right before it is
+ * frozen, so the event will remain only partially processed until the system is
+ * woken up by another event.  In particular, it won't cause the transition to
+ * a sleep state to be aborted.
+ *
+ * This difficulty may be overcome if user space uses 'wakeup_count' before
+ * writing to 'state'.  It first should read from 'wakeup_count' and store
+ * the read value.  Then, after carrying out its own preparations for the system
+ * transition to a sleep state, it should write the stored value to
+ * 'wakeup_count'.  If that fails, at least one wakeup event has occured since
+ * 'wakeup_count' was read and 'state' should not be written to.  Otherwise, it
+ * is allowed to write to 'state', but the transition will be aborted if there
+ * are any wakeup events detected after 'wakeup_count' was written to.
+ */
+
+static ssize_t wakeup_count_show(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				char *buf)
+{
+	unsigned long val;
+
+	return pm_get_wakeup_count(&val) ? sprintf(buf, "%lu\n", val) : -EINTR;
+}
+
+static ssize_t wakeup_count_store(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				const char *buf, size_t n)
+{
+	unsigned long val;
+
+	if (sscanf(buf, "%lu", &val) == 1) {
+		if (pm_save_wakeup_count(val))
+			return n;
+	}
+	return -EINVAL;
+}
+
+power_attr(wakeup_count);
+#endif /* CONFIG_PM_SLEEP */
+
 #ifdef CONFIG_PM_TRACE
 int pm_trace_enabled;
 
@@ -253,7 +307,7 @@ power_attr(wake_unlock);
 
 #ifdef CONFIG_DVFS_LIMIT
 static int dvfsctrl_locked;
-static int dvfs_ctrl;
+static int gdDvfsctrl;
 
 static void do_dvfsunlock_timer(struct work_struct *work);
 static DECLARE_DELAYED_WORK(dvfslock_ctrl_unlock_work, do_dvfsunlock_timer);
@@ -264,11 +318,11 @@ static ssize_t dvfslock_ctrl(const char *buf, size_t count)
 	int dlevel;
 	int dtime_msec;
 
-	ret = sscanf(buf, "%u", &dvfs_ctrl);
+	ret = sscanf(buf, "%u", &gdDvfsctrl);
 	if (ret != 1)
 		return -EINVAL;
 
-	if (dvfs_ctrl == 0) {
+	if (gdDvfsctrl ==0) {
 		if (dvfsctrl_locked) {
 			s5pv310_cpufreq_lock_free(DVFS_LOCK_ID_APP);
 			dvfsctrl_locked = 0;
@@ -280,18 +334,21 @@ static ssize_t dvfslock_ctrl(const char *buf, size_t count)
 		return 0;
 	}
 
-	dlevel = dvfs_ctrl >> 16;
-	if (dlevel >= CPU_LEVEL_END || dlevel < 0) {
-		printk(KERN_DEBUG "%s: Invalid level = %d,\n", __func__, dlevel);
-		dlevel = CPU_LEVEL_END - 1;
-	}
+	dlevel = gdDvfsctrl / 10000;
+	dtime_msec = gdDvfsctrl % 10000;
 
-	dtime_msec = dvfs_ctrl & 0xFFFF;
+	if (dtime_msec < 16)
+		dtime_msec = 16;
+
 	if (dtime_msec == 0)
 		return -EINVAL;
 
-	printk(KERN_DEBUG "%s: dvfs_ctrl=%d, level=%d, time=%d\n",
-		__func__, dvfs_ctrl, dlevel, dtime_msec);
+	if (dlevel)
+		dlevel = CPU_L1;
+	else
+		dlevel = CPU_L0;
+
+	printk(KERN_DEBUG "%s: level = %d, time =%d\n", __func__, dlevel, dtime_msec);
 
 	s5pv310_cpufreq_lock(DVFS_LOCK_ID_APP, dlevel);
 	dvfsctrl_locked = 1;
@@ -303,8 +360,6 @@ static ssize_t dvfslock_ctrl(const char *buf, size_t count)
 
 static void do_dvfsunlock_timer(struct work_struct *work)
 {
-	printk(KERN_DEBUG "%s: dvfs_ctrl=%d\n", __func__, dvfs_ctrl);
-
 	dvfsctrl_locked = 0;
 	s5pv310_cpufreq_lock_free(DVFS_LOCK_ID_APP);
 }
@@ -312,7 +367,7 @@ static void do_dvfsunlock_timer(struct work_struct *work)
 static ssize_t dvfslock_ctrl_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "0x%08x\n", dvfs_ctrl);
+	return sprintf(buf, "0x%08x\n", gdDvfsctrl);
 }
 
 static ssize_t dvfslock_ctrl_store(struct kobject *kobj, struct kobj_attribute *attr,
@@ -322,69 +377,53 @@ static ssize_t dvfslock_ctrl_store(struct kobject *kobj, struct kobj_attribute *
 	return n;
 }
 
-static int dvfslimit_val;
-static int dvfslimit_level;
 static int dvfslimit_locked;
+static int gdDvfslimit;
 static void do_dvfslimit_unlock_timer(struct work_struct *work);
 static DECLARE_DELAYED_WORK(dvfslimit_ctrl_unlock_work, do_dvfslimit_unlock_timer);
-DEFINE_MUTEX(dvfslimit_mutex);
 
-static void dvfslimit_ctrl(const char *buf)
+static ssize_t dvfslimit_ctrl(const char *buf, size_t count)
 {
 	unsigned int ret = -EINVAL;
 	int limit_level;
 	int dtime_msec;
-	int temp;
 
-	mutex_lock(&dvfslimit_mutex);
+	ret = sscanf(buf, "%u", &gdDvfslimit);
+	if (ret != 1)
+		return -EINVAL;
 
-	temp = dvfslimit_val;
-	ret = sscanf(buf, "%u", &dvfslimit_val);
-	if (ret != 1) {
-		printk(KERN_ERR "dvfslimit_ctrl is invalid format\n");
-		goto out;
-	}
-
-	if (dvfslimit_val == 0) {
+	if (gdDvfslimit == 0) {
 		if (dvfslimit_locked) {
 			s5pv310_cpufreq_upper_limit_free(DVFS_LOCK_ID_APP);
 			dvfslimit_locked = 0;
-		} else {
-			printk(KERN_ERR
-			"Write lower level than CPU_L0 for upper limit\n");
 		}
-		goto out;
+		return -EINVAL;
 	}
-
-	limit_level = dvfslimit_val >> 16;
-	if (limit_level >= CPU_LEVEL_END || limit_level < 0) {
-		printk(KERN_ERR "%s - Invalid level = %d,\n", __func__, limit_level);
-		goto out;
-	}
-
 	if (dvfslimit_locked) {
-		printk(KERN_ERR "%s - already locked dvfslimit_ctrl."
-				"so, your request is ignored!\n", __func__);
-		dvfslimit_val = temp;
-		goto out;
+		printk(KERN_ERR "%s - already locked dvfsctrl\n", __func__);
+		return 0;
 	}
 
-	dvfslimit_level = limit_level;
+	limit_level = gdDvfslimit / 10000;
+	dtime_msec = gdDvfslimit % 10000;
 
-	dtime_msec = dvfslimit_val & 0xFFFF;
+	if (dtime_msec < 16)
+		dtime_msec = 16;
 
-	printk(KERN_DEBUG "%s: dvfslimit=%d, level=%d, time=%d\n",
-			__func__, dvfslimit_val, limit_level, dtime_msec);
+	if (dtime_msec == 0)
+		return -EINVAL;
 
-	s5pv310_cpufreq_upper_limit(DVFS_LOCK_ID_APP, limit_level);
-	dvfslimit_locked = 1;
+	if ((limit_level > 0) && (limit_level < CPU_LEVEL_END)) {
+		s5pv310_cpufreq_upper_limit(DVFS_LOCK_ID_APP, limit_level);
+		dvfslimit_locked = 1;
+		printk(KERN_DEBUG "%s: limit level = %d\n", __func__, limit_level);
+		schedule_delayed_work(&dvfslimit_ctrl_unlock_work, msecs_to_jiffies(dtime_msec));
+	} else {
+		limit_level = CPU_L0;
+		printk(KERN_ERR "%s - %d is wrong CPUFreq level\n", __func__, limit_level);
+	}
 
-	if (dtime_msec)
-		schedule_delayed_work(&dvfslimit_ctrl_unlock_work,
-					msecs_to_jiffies(dtime_msec));
-out:
-	mutex_unlock(&dvfslimit_mutex);
-	return;
+	return -EINVAL;
 }
 
 static void do_dvfslimit_unlock_timer(struct work_struct *work)
@@ -396,16 +435,13 @@ static void do_dvfslimit_unlock_timer(struct work_struct *work)
 static ssize_t dvfslimit_ctrl_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-	if (dvfslimit_locked)
-		return sprintf(buf, "0x%08x\n", dvfslimit_val);
-	else
-		return sprintf(buf, "%s\n", "dvfslimit unlocked");
+	return sprintf(buf, "0x%08x\n", gdDvfslimit);
 }
 
 static ssize_t dvfslimit_ctrl_store(struct kobject *kobj, struct kobj_attribute *attr,
 					const char *buf, size_t n)
 {
-	dvfslimit_ctrl(buf);
+	dvfslimit_ctrl(buf, 0);
 	return n;
 }
 
@@ -413,13 +449,14 @@ power_attr(dvfslimit_ctrl);
 power_attr(dvfslock_ctrl);
 #endif
 
-static struct attribute *g[] = {
+static struct attribute * g[] = {
 	&state_attr.attr,
 #ifdef CONFIG_PM_TRACE
 	&pm_trace_attr.attr,
 #endif
 #ifdef CONFIG_PM_SLEEP
 	&pm_async_attr.attr,
+	&wakeup_count_attr.attr,
 #ifdef CONFIG_PM_DEBUG
 	&pm_test_attr.attr,
 #endif

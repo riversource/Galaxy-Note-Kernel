@@ -45,7 +45,7 @@ struct platform_device s3c_device_adc = {
 	.resource	= s3c_adc_resource,
 };
 
-void __init s3c_adc_set_platdata(struct s3c_adc_mach_info *pd)
+void s3c_adc_set_platdata(struct s3c_adc_mach_info *pd)
 {
 	struct s3c_adc_plat_info *npd;
 

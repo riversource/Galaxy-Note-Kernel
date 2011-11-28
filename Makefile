@@ -189,7 +189,7 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 export KBUILD_BUILDHOST := $(SUBARCH)
 ARCH		?= arm
-CROSS_COMPILE	?= /opt/toolchains/arm-2009q3/bin/arm-none-linux-gnueabi-
+CROSS_COMPILE	?= /opt/toolchains/arm-2009q3/bin/arm-none-eabi-
 CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
 
 # Architecture as present in compile.h
@@ -330,16 +330,14 @@ KALLSYMS	= scripts/kallsyms
 PERL		= perl
 CHECK		= sparse
 
-FM_FLAGS        =
-#FM_FLAGS        = -fsched-spec-load -funswitch-loops -fpredictive-commoning -fgcse-after-reload -ftree-vectorize -fipa-cp-clone -ffast-math -fsingle-precision-constant -pipe -mtune=cortex-a9 -mfpu=neon -march=armv7-a
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
 MODFLAGS	= -DMODULE
-CFLAGS_MODULE   = $(MODFLAGS) $(FM_FLAGS)
+CFLAGS_MODULE   = $(MODFLAGS)
 AFLAGS_MODULE   = $(MODFLAGS)
 LDFLAGS_MODULE  = -T $(srctree)/scripts/module-common.lds
-CFLAGS_KERNEL	= $(FM_FLAGS)
-AFLAGS_KERNEL	=
+CFLAGS_KERNEL	= -mtune=cortex-a9 -mfpu=vfpv3 -march=armv7-a -fsingle-precision-constant -ftree-loop-distribution -ftree-vectorize -fvect-cost-model -funsafe-math-optimizations -ftree-loop-im -funswitch-loops -ffast-math
+AFLAGS_KERNEL	= -mtune=cortex-a9 -mfpu=vfpv3 -march=armv7-a -fsingle-precision-constant -ftree-loop-distribution -ftree-vectorize -fvect-cost-model -funsafe-math-optimizations -ftree-loop-im -funswitch-loops -ffast-math
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
 
@@ -351,17 +349,15 @@ LINUXINCLUDE    := -I$(srctree)/arch/$(hdr-arch)/include -Iinclude \
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 
-KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
+KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
-		   -fno-delete-null-pointer-checks
-#change@wtl.kSingh - enabling FIPS mode - starts
-ifeq ($(USE_SEC_FIPS_MODE),true)
-KBUILD_CFLAGS += -DSEC_FIPS_ENABLED
-endif
-#change@wtl.kSingh - enabling FIPS mode - ends
-
+		   -fno-delete-null-pointer-checks \
+		   -funroll-loops -march=armv7-a -mtune=cortex-a9 \
+		   -mfpu=vfpv3 -mfloat-abi=hard \
+		   -ftree-vectorize -mvectorize-with-neon-quad \
+		   -floop-interchange -floop-strip-mine -floop-block -ffast-math -funsafe-loop-optimizations
 KBUILD_AFLAGS   := -D__ASSEMBLY__
 
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
@@ -538,7 +534,7 @@ endif # $(dot-config)
 all: vmlinux
 
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
-KBUILD_CFLAGS	+= -Os
+KBUILD_CFLAGS	+= -O1
 else
 KBUILD_CFLAGS	+= -O2
 endif
@@ -553,9 +549,6 @@ endif
 ifndef CONFIG_CC_STACKPROTECTOR
 KBUILD_CFLAGS += $(call cc-option, -fno-stack-protector)
 endif
-
-# This warning generated too much noise in a regular build.
-BUILD_CFLAGS += $(call cc-option,-Wno-pointer-sign,)
 
 ifdef CONFIG_FRAME_POINTER
 KBUILD_CFLAGS	+= -fno-omit-frame-pointer -fno-optimize-sibling-calls
@@ -592,7 +585,7 @@ CHECKFLAGS     += $(NOSTDINC_FLAGS)
 KBUILD_CFLAGS += $(call cc-option,-Wdeclaration-after-statement,)
 
 # disable pointer signed / unsigned warnings in gcc 4.0
-KBUILD_CFLAGS += $(call cc-disable-warning, pointer-sign)
+KBUILD_CFLAGS += $(call cc-option,-Wno-pointer-sign,)
 
 # disable invalid "can't wrap" optimizations for signed / pointers
 KBUILD_CFLAGS	+= $(call cc-option,-fno-strict-overflow)

@@ -16,10 +16,13 @@
 #include <linux/gpio.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
+#include <linux/notifier.h>
+#include <linux/percpu.h>
 
 #include <asm/proc-fns.h>
 #include <asm/cacheflush.h>
 #include <asm/hardware/cache-l2x0.h>
+#include <asm/idle.h>
 
 #include <plat/pm.h>
 #include <plat/cpu.h>
@@ -34,6 +37,30 @@
 #include <plat/devs.h>
 
 #include <mach/ext-gic.h>
+
+static ATOMIC_NOTIFIER_HEAD(idle_notifier);
+
+void idle_notifier_register(struct notifier_block *n)
+{
+	atomic_notifier_chain_register(&idle_notifier, n);
+}
+EXPORT_SYMBOL_GPL(idle_notifier_register);
+
+void idle_notifier_unregister(struct notifier_block *n)
+{
+	atomic_notifier_chain_unregister(&idle_notifier, n);
+}
+EXPORT_SYMBOL_GPL(idle_notifier_unregister);
+
+static void enter_idle(void)
+{
+	atomic_notifier_call_chain(&idle_notifier, IDLE_START, NULL);
+}
+
+static void exit_idle(void)
+{
+	atomic_notifier_call_chain(&idle_notifier, IDLE_END, NULL);
+}
 
 /* enable AFTR/LPA feature */
 static enum { ENABLE_IDLE = 0, ENABLE_AFTR = 1, ENABLE_LPA = 2 } enable_mask =
@@ -890,17 +917,14 @@ early_wakeup:
 
 static void s5pv310_check_enter(void)
 {
-	/* unsigned int check = 0; */
+	unsigned int check = 0;
 	unsigned int val;
 
 	/* Check UART for console is empty */
 	val = __raw_readl(S5P_VA_UART(CONFIG_S3C_LOWLEVEL_UART_PORT) + 0x18);
 
-	/* Never reach below state : check is 0, and it doen't changed */
-	/* FIXME
-	 * while (check)
-	 *	check = ((val >> 16) & 0xff);
-	 */
+	while (check)
+		check = ((val >> 16) & 0xff);
 }
 
 extern void bt_uart_rts_ctrl(int flag);
@@ -917,9 +941,6 @@ static int s5pv310_enter_core0_lpa(struct cpuidle_device *dev,
 	/* ON */
 	gpio_set_value(S5PV310_GPX1(6), 0);
 	gpio_set_value(S5PV310_GPX1(7), 0);
-#endif
-#ifdef CONFIG_SAMSUNG_PHONE_TTY
-	gpio_set_value(GPIO_PDA_ACTIVE, 0);
 #endif
 
 	s3c_pm_do_save(s5pv310_lpa_save, ARRAY_SIZE(s5pv310_lpa_save));
@@ -1017,9 +1038,6 @@ early_wakeup:
 #ifdef AFTR_DEBUG
 	/* OFF */
 	gpio_set_value(S5PV310_GPX1(7), 1);
-#endif
-#ifdef CONFIG_SAMSUNG_PHONE_TTY
-	gpio_set_value(GPIO_PDA_ACTIVE, 1);
 #endif
 
 	local_irq_enable();
@@ -1243,7 +1261,6 @@ static int check_usbotg_op(void)
 	return val & (A_SESSION_VALID | B_SESSION_VALID);
 }
 
-#ifdef CONFIG_USB_EHCI_HCD
 static int check_usb_host_op(void)
 {
 	extern int is_usb_host_phy_suspend(void);
@@ -1253,7 +1270,6 @@ static int check_usb_host_op(void)
 
 	return 1;
 }
-#endif
 
 #ifdef CONFIG_SND_S5P_RP
 extern int s5p_rp_get_op_level(void);	/* By srp driver */
@@ -1262,17 +1278,6 @@ extern volatile int s5p_rp_is_running;
 
 #ifdef CONFIG_RFKILL
 extern volatile int bt_is_running;
-#endif
-
-#ifdef CONFIG_SAMSUNG_PHONE_TTY
-static int is_dpram_in_use(void)
-{
-	/* This pin is high when CP might be accessing dpram */
-	/* return !!gpio_get_value(GPIO_CP_DUMP_INT); */
-	int x1_2 = __raw_readl(S5PV310_VA_GPIO2 + 0xC24) & 4; /* GPX1(2) */
-	pr_err("%s x1_2 is %s\n", __func__, x1_2 ? "high" : "low");
-	return x1_2;
-}
 #endif
 
 static int s5pv310_check_operation(void)
@@ -1294,23 +1299,16 @@ static int s5pv310_check_operation(void)
 #ifdef CONFIG_SND_S5P_RP
 	if (s5p_rp_get_op_level())
 		return 1;
+#endif
 
 	if (!s5p_rp_is_running)
 		return 1;
-#endif
 
-#ifdef CONFIG_USB_EHCI_HCD
 	if (check_usb_host_op())
 		return 1;
-#endif
 
 #ifdef CONFIG_RFKILL
 	if (bt_is_running)
-		return 1;
-#endif
-
-#ifdef CONFIG_SAMSUNG_PHONE_TTY
-	if (is_dpram_in_use())
 		return 1;
 #endif
 
@@ -1321,6 +1319,7 @@ static int s5pv310_enter_lowpower(struct cpuidle_device *dev,
 				  struct cpuidle_state *state)
 {
 	struct cpuidle_state *new_state = state;
+	int ret;
 
 	/* This mode only can be entered when Core1 is offline */
 	if (cpu_online(1)) {
@@ -1329,17 +1328,20 @@ static int s5pv310_enter_lowpower(struct cpuidle_device *dev,
 	}
 	dev->last_state = new_state;
 
+	enter_idle();
 	if (new_state == &dev->states[0])
-		return s5pv310_enter_idle(dev, new_state);
-
-	if (s5pv310_check_operation())
-		return (enable_mask & ENABLE_AFTR)
+		ret = s5pv310_enter_idle(dev, new_state);
+	else if (s5pv310_check_operation())
+		ret = (enable_mask & ENABLE_AFTR)
 			? s5pv310_enter_core0_aftr(dev, new_state)
 			: s5pv310_enter_idle(dev, new_state);
+	else
+		ret = (enable_mask & ENABLE_LPA)
+			? s5pv310_enter_core0_lpa(dev, new_state)
+			: s5pv310_enter_idle(dev, new_state);
+	exit_idle();
 
-	return (enable_mask & ENABLE_LPA)
-		? s5pv310_enter_core0_lpa(dev, new_state)
-		: s5pv310_enter_idle(dev, new_state);
+	return ret;
 }
 
 static int s5pv310_init_cpuidle(void)

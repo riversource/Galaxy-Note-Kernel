@@ -442,7 +442,7 @@ void set_hpd_irq(bool on)
 
 
 
-static int __init s5p_hpd_probe(struct platform_device *pdev)
+static int s5p_hpd_probe(struct platform_device *pdev)
 {
 	struct s5p_platform_hpd *pdata;
 	int ret;
