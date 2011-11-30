@@ -24,13 +24,13 @@ then
 
 # CWM Manager
 
-#    toolbox rm /system/app/CWMManager.apk
-#    toolbox rm /data/dalvik-cache/*CWMManager.apk*
-#    toolbox rm /data/app/eu.chainfire.cfroot.cwmmanager*.apk
+    toolbox rm /system/app/CWMManager.apk
+    toolbox rm /data/dalvik-cache/*CWMManager.apk*
+    toolbox rm /data/app/eu.chainfire.cfroot.cwmmanager*.apk
 
-#    toolbox cat /res/misc/CWMManager.apk > /system/app/CWMManager.apk
-#    toolbox chown 0.0 /system/app/CWMManager.apk
-#    toolbox chmod 644 /system/app/CWMManager.apk
+    toolbox cat /res/misc/CWMManager.apk > /system/app/CWMManager.apk
+    toolbox chown 0.0 /system/app/CWMManager.apk
+    toolbox chmod 644 /system/app/CWMManager.apk
 
 # Once be enough
     toolbox mkdir /system/cfroot
