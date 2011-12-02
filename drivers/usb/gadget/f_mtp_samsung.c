@@ -1188,7 +1188,7 @@ static int mtpg_function_setup(struct usb_function *f,
 	return value;
 }
 
-int mtp_function_add(struct usb_configuration *c)
+int __init mtp_function_add(struct usb_configuration *c)
 {
 	struct mtpg_dev	*mtpg;
 	int		status;

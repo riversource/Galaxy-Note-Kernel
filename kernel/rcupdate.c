@@ -86,7 +86,7 @@ int rcu_read_lock_bh_held(void)
 {
 	if (!debug_lockdep_rcu_enabled())
 		return 1;
-	return in_softirq() || irqs_disabled();
+	return in_softirq();
 }
 EXPORT_SYMBOL_GPL(rcu_read_lock_bh_held);
 
@@ -114,8 +114,3 @@ int rcu_my_thread_group_empty(void)
 }
 EXPORT_SYMBOL_GPL(rcu_my_thread_group_empty);
 #endif /* #ifdef CONFIG_PROVE_RCU */
-
-#ifndef CONFIG_JRCU
-
-
-#endif /*CONFIG_JRCU*/

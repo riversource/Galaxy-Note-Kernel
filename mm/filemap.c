@@ -34,7 +34,6 @@
 #include <linux/hardirq.h> /* for BUG_ON(!in_atomic()) only */
 #include <linux/memcontrol.h>
 #include <linux/mm_inline.h> /* for page_is_file_cache() */
-#include <linux/cleancache.h>
 #include "internal.h"
 
 /*
@@ -119,11 +118,6 @@
 void __remove_from_page_cache(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
-
-	if (PageUptodate(page) && PageMappedToDisk(page))
-		cleancache_put_page(page);
-	else
-		cleancache_flush_page(mapping, page);
 
 	radix_tree_delete(&mapping->page_tree, page->index);
 	page->mapping = NULL;
@@ -1453,9 +1447,6 @@ static void do_sync_mmap_readahead(struct vm_area_struct *vma,
 	if (VM_RandomReadHint(vma))
 		return;
 
-	if (!ra->ra_pages)
-		return;
-
 	if (VM_SequentialReadHint(vma) ||
 			offset - 1 == (ra->prev_pos >> PAGE_CACHE_SHIFT)) {
 		page_cache_sync_readahead(mapping, ra, file, offset,
@@ -1463,7 +1454,7 @@ static void do_sync_mmap_readahead(struct vm_area_struct *vma,
 		return;
 	}
 
-	if (ra->mmap_miss < MMAP_LOTSAMISS * 10)
+	if (ra->mmap_miss < INT_MAX)
 		ra->mmap_miss++;
 
 	/*
@@ -1477,10 +1468,12 @@ static void do_sync_mmap_readahead(struct vm_area_struct *vma,
 	 * mmap read-around
 	 */
 	ra_pages = max_sane_readahead(ra->ra_pages);
-	ra->start = max_t(long, 0, offset - ra_pages/2);
-	ra->size = ra_pages;
-	ra->async_size = 0;
-	ra_submit(ra, mapping, file);
+	if (ra_pages) {
+		ra->start = max_t(long, 0, offset - ra_pages/2);
+		ra->size = ra_pages;
+		ra->async_size = 0;
+		ra_submit(ra, mapping, file);
+	}
 }
 
 /*
