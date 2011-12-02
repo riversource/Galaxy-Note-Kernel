@@ -65,7 +65,7 @@ UTS_TRUNCATE="cut -b -$UTS_LEN"
 
   echo \#define LINUX_COMPILE_TIME \"`date +%T`\"
   echo \#define LINUX_COMPILE_BY \"frank_m\"
-  echo \#define LINUX_COMPILE_HOST \"VirtualBox | $UTS_TRUNCATE`\"
+  echo \#define LINUX_COMPILE_HOST \"VirtualBox\"
 
   domain=`dnsdomainname 2> /dev/null`
   if [ -z "$domain" ]; then
