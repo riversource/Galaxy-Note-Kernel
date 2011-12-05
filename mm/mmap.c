@@ -902,14 +902,7 @@ struct anon_vma *find_mergeable_anon_vma(struct vm_area_struct *vma)
 	if (anon_vma)
 		return anon_vma;
 try_prev:
-	/*
-	 * It is potentially slow to have to call find_vma_prev here.
-	 * But it's only on the first write fault on the vma, not
-	 * every time, and we could devise a way to avoid it later
-	 * (e.g. stash info in next's anon_vma_node when assigning
-	 * an anon_vma, or when trying vma_merge).  Another time.
-	 */
-	BUG_ON(find_vma_prev(vma->vm_mm, vma->vm_start, &near) != vma);
+	near = vma->vm_prev;
 	if (!near)
 		goto none;
 

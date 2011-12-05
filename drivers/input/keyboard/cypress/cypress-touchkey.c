@@ -1912,14 +1912,12 @@ static int __init touchkey_init(void)
 	unsigned char get_touch = 0x40;
 #endif
 
-#ifndef CONFIG_MACH_Q1_REV02
 	if (gpio_request(_3_TOUCH_SDA_28V, "_3_TOUCH_SDA_28V"))
 		WARN(1, "Fail to request gpio (_3_TOUCH_SDA_28V)\n");
 	if (gpio_request(_3_TOUCH_SCL_28V, "_3_TOUCH_SCL_28V"))
 		WARN(1, "Fail to request gpio (_3_TOUCH_SCL_28V)\n");
 	if (gpio_request(_3_GPIO_TOUCH_EN, "_3_GPIO_TOUCH_EN"))
 		WARN(1, "Fail to request gpio (_3_GPIO_TOUCH_EN)\n");
-#endif
 	if (gpio_request(_3_GPIO_TOUCH_INT, "_3_GPIO_TOUCH_INT"))
 		WARN(1, "Fail to request gpio (_3_GPIO_TOUCH_INT)\n");
 
@@ -2217,11 +2215,9 @@ static void __exit touchkey_exit(void)
 		destroy_workqueue(touchkey_wq);
 	}
 
-#ifndef CONFIG_MACH_Q1_REV02
 	gpio_free(_3_TOUCH_SDA_28V);
 	gpio_free(_3_TOUCH_SCL_28V);
 	gpio_free(_3_GPIO_TOUCH_EN);
-#endif
 	gpio_free(_3_GPIO_TOUCH_INT);
 }
 

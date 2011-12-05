@@ -1542,6 +1542,7 @@ out_nomem:
 static int shmem_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	file_accessed(file);
+	vma->vm_file = file;
 	vma->vm_ops = &shmem_vm_ops;
 	vma->vm_flags |= VM_CAN_NONLINEAR;
 	return 0;
@@ -2759,7 +2760,6 @@ int shmem_zero_setup(struct vm_area_struct *vma)
 	file = shmem_file_setup("dev/zero", size, vma->vm_flags);
 	if (IS_ERR(file))
 		return PTR_ERR(file);
-
 	shmem_set_file(vma, file);
 	return 0;
 }

@@ -309,7 +309,7 @@ struct s3cfb_user_chroma {
 #endif /* MALI_USE_UNIFIED_MEMORY_PROVIDER */
 
 extern struct fb_ops			s3cfb_ops;
-extern inline struct s3cfb_global	*get_fimd_global(int id);
+extern /*inline*/ struct s3cfb_global	*get_fimd_global(int id);
 
 /* S3CFB */
 extern struct s3c_platform_fb *to_fb_plat(struct device *dev);

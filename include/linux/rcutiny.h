@@ -126,6 +126,10 @@ static inline int rcu_preempt_depth(void)
 	return 0;
 }
 
+static inline void rcu_cpu_stall_reset(void)
+{
+}
+
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 
 extern int rcu_scheduler_active __read_mostly;
