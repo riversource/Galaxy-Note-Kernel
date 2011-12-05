@@ -24,6 +24,7 @@ config ARM
 	select HAVE_KERNEL_GZIP
 	select HAVE_KERNEL_LZO
 	select HAVE_KERNEL_LZMA
+	select HAVE_KERNEL_XZ
 	select HAVE_PERF_EVENTS
 	select PERF_USE_VMALLOC
 	help
@@ -36,12 +37,6 @@ config ARM
 
 config HAVE_PWM
 	bool
-
-config TCP4_ATT_PATCH
-       bool "ATT TCP4 patch"
-	   default n
-	   help
-	     Support for ATT TCP stack changes
 
 config SYS_SUPPORTS_APM_EMULATION
 	bool
@@ -285,6 +280,7 @@ config ARCH_AT91
 	bool "Atmel AT91"
 	select ARCH_REQUIRE_GPIOLIB
 	select HAVE_CLK
+	select ARCH_USES_GETTIMEOFFSET
 	help
 	  This enables support for systems based on the Atmel AT91RM9200,
 	  AT91SAM9 and AT91CAP9 processors.
@@ -423,10 +419,10 @@ config ARCH_IOP33X
 	  Support for Intel's IOP33X (XScale) family of processors.
 
 config ARCH_IXP23XX
-	bool "IXP23XX-based"
+ 	bool "IXP23XX-based"
 	depends on MMU
 	select CPU_XSC3
-	select PCI
+ 	select PCI
 	select ARCH_USES_GETTIMEOFFSET
 	help
 	  Support for Intel's IXP23xx (XScale) family of processors.
@@ -1227,6 +1223,13 @@ source "drivers/pcmcia/Kconfig"
 
 endmenu
 
+menu "Samsung Kernel Debug Features"
+
+config KERNEL_DEBUG_SEC
+        bool "KERNEL_DEBUG_SEC"
+
+endmenu
+
 menu "Kernel Features"
 
 source "kernel/time/Kconfig"
@@ -1256,6 +1259,31 @@ config SMP
 	  <http://www.linuxdoc.org/docs.html#howto>.
 
 	  If you don't know what to do here, say N.
+
+config ARM_CPU_TOPOLOGY
+	bool "Support cpu topology definition"
+	depends on SMP && CPU_V7
+	default y
+	help
+	  Support ARM cpu topology definition. The MPIDR register defines
+	  affinity between processors which is then used to describe the cpu
+	  topology of an ARM System.
+
+config SCHED_MC
+	bool "Multi-core scheduler support"
+	depends on ARM_CPU_TOPOLOGY
+	help
+	  Multi-core scheduler support improves the CPU scheduler's decision
+	  making when dealing with multi-core CPU chips at a cost of slightly
+	  increased overhead in some places. If unsure say N here.
+
+config SCHED_SMT
+	bool "SMT scheduler support"
+	depends on ARM_CPU_TOPOLOGY
+	help
+	  Improves the CPU scheduler's decision making when dealing with
+	  MultiThreading at a cost of slightly increased overhead in some
+	  places. If unsure say N here.
 
 config HAVE_ARM_SCU
 	bool
@@ -1506,6 +1534,16 @@ config ALIGNMENT_TRAP
 	  here, which has a severe performance impact. This is necessary for
 	  correct operation of some network protocols. With an IP-only
 	  configuration it is safe to say N, otherwise say Y.
+
+config ALLOW_CPU_ALIGNMENT
+	bool "Allow CPU-based alignment handling"
+	default y if ARCH_MSM_SCORPION || ARCH_MSM_SCORPIONMP
+	help
+	  Advanced ARM processors, such as the Cortex series and ARMv7-based
+	  CPUS are capable of performing unaligned accesses for many types of
+	  memory accesses.  Typically, using a cpu-based alignment fixup is
+	  faster than doing such a fixup in software.  For best performance
+	  on advanced CPUs, say Y here.
 
 config UACCESS_WITH_MEMCPY
 	bool "Use kernel mem{cpy,set}() for {copy_to,clear}_user() (EXPERIMENTAL)"

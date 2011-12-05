@@ -156,6 +156,8 @@ void __srcu_read_unlock(struct srcu_struct *sp, int idx)
 }
 EXPORT_SYMBOL_GPL(__srcu_read_unlock);
 
+#define SYNCHRONIZE_SRCU_READER_DELAY	10
+
 /*
  * Helper function for synchronize_srcu() and synchronize_srcu_expedited().
  */
@@ -208,6 +210,7 @@ static void __synchronize_srcu(struct srcu_struct *sp, void (*sync_func)(void))
 	 * will have finished executing.
 	 */
 
+	
 	while (srcu_readers_active_idx(sp, idx))
 		schedule_timeout_interruptible(1);
 

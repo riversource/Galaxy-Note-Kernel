@@ -47,16 +47,17 @@
 #include <mach/pm-core.h>
 
 /* UV */
-int exp_UV_mV[9] = { 
+int exp_UV_mV[10] = { 
 	1500000, //1704Mhz
 	1450000, //1600Mhz
 	1350000, //1400Mhz
 	1300000, //1200Mhz
 	1200000, //1000Mhz
-	1100000, // 800Mhz
-	1000000, // 500Mhz
-	975000,  // 200Mhz
-	975000,  // 100Mhz
+	1100000, //800Mhz
+	1000000, //500Mhz
+	975000,  //200Mhz
+	975000,  //100Mhz
+	975000,  //50Mhz
 };
 
 static struct clk *arm_clk;
@@ -98,13 +99,13 @@ enum s5pv310_memory_type{
 };
 
 enum cpufreq_level_index{
-	L0, L1, L2, L3, L4, L5, L6, L7, L8, CPUFREQ_LEVEL_END,
+	L0, L1, L2, L3, L4, L5, L6, L7, L8, L9, CPUFREQ_LEVEL_END,
 };
 
 
 //don't ask me why we have another table. this is just an easy solution
 static unsigned int abyss_freq_table[] = {
-	1704,1600,1400,1200,1000,800,500,200,100
+	1704,1600,1400,1200,1000,800,500,200,100,50
 };
 
 static unsigned int freq_trans_table[CPUFREQ_LEVEL_END][CPUFREQ_LEVEL_END] = {
@@ -129,15 +130,16 @@ static unsigned int freq_trans_table[CPUFREQ_LEVEL_END][CPUFREQ_LEVEL_END] = {
 	 *  500
 	 *  200
 	*/
-	{ 0, 4, 4, 4, 4, 4, 4, 4, 4 },
-	{ 2, 0, 4, 4, 4, 4, 4, 4, 4 },
-	{ 2, 2, 0, 4, 4, 4, 4, 4, 4 },
-	{ 2, 2, 2, 0, 4, 4, 4, 4, 4 },
-	{ 2, 2, 2, 2, 0, 4, 4, 4, 4 },
-	{ 2, 2, 2, 2, 2, 0, 4, 4, 4 },
-	{ 2, 2, 2, 2, 2, 2, 0,12,12 },
-	{ 2, 2, 2, 2, 2, 2,10, 0,12 },
-	{ 2, 2, 2, 2, 2, 2,10,10, 0 },
+	{ 0, 4, 4, 4, 4, 4, 4, 4, 4, 4 },
+	{ 2, 0, 4, 4, 4, 4, 4, 4, 4, 4 },
+	{ 2, 2, 0, 4, 4, 4, 4, 4, 4, 4 },
+	{ 2, 2, 2, 0, 4, 4, 4, 4, 4, 4 },
+	{ 2, 2, 2, 2, 0, 4, 4, 4, 4, 4 },
+	{ 2, 2, 2, 2, 2, 0, 4, 4, 4, 4 },
+	{ 2, 2, 2, 2, 2, 2, 0,12,12, 4 },
+	{ 2, 2, 2, 2, 2, 2,10, 0,12, 4 },
+	{ 2, 2, 2, 2, 2, 2,10,10, 0, 4 },
+	{ 2, 2, 2, 2, 2, 2,10,10, 4, 0 },
 };
 
 static struct cpufreq_frequency_table s5pv310_freq_table[] = {
@@ -150,6 +152,7 @@ static struct cpufreq_frequency_table s5pv310_freq_table[] = {
 	{L6, 500*1000},
 	{L7, 200*1000},
 	{L8, 100*1000},
+	{L9, 50*1000},
 	{0, CPUFREQ_TABLE_END},
 };
 
@@ -261,6 +264,9 @@ static unsigned int clkdiv_cpu0[CPUFREQ_LEVEL_END][7] = {
 
 	/* ARM L8: 100MHz */
 	{ 0, 1, 3, 1, 3, 1, 7 },
+
+	/* ARM L9: 50MHz */
+	{ 0, 1, 3, 1, 3, 1, 7 },
 };
 
 static unsigned int clkdiv_cpu1[CPUFREQ_LEVEL_END][2] = {
@@ -292,6 +298,9 @@ static unsigned int clkdiv_cpu1[CPUFREQ_LEVEL_END][2] = {
 	{ 3, 0 },
 
 	/* ARM L8: 100MHz */
+	{ 3, 0 },
+
+	/* ARM L9: 50MHz */
 	{ 3, 0 },
 };
 
@@ -376,21 +385,22 @@ struct cpufreq_voltage_table {
 	unsigned int	int_volt;
 };
 
-/* ASV table to work 1.7GHz in DVFS has 9 asv level. */
-static unsigned int s5pv310_asv_cpu_volt_table[9][CPUFREQ_LEVEL_END] = {
-	{ 1650000, 1550000, 1500000, 1400000, 1200000, 1100000, 1150000, 1150000 },	/* 0 */
-	{ 1550000, 1450000, 1400000, 1300000, 1200000, 1100000, 1050000, 1050000 },	/* 1 */
-	{ 1500000, 1400000, 1350000, 1250000, 1150000, 1050000, 1000000, 1000000 },	/* 2 */
-	{ 1450000, 1350000, 1300000, 1200000, 1100000, 1000000,  975000,  975000 },	/* 3 */
-	{ 1425000, 1325000, 1275000, 1175000, 1075000,  975000,  950000,  950000 },	/* 4 */
-	{ 1400000, 1300000, 1250000, 1150000, 1050000,  975000,  950000,  950000 },	/* 5 */
-	{ 1400000, 1300000, 1250000, 1150000, 1050000,  975000,  925000,  925000 },	/* 6 */
-	{ 1350000, 1250000, 1200000, 1100000, 1000000,  975000,  925000,  925000 },	/* 7 */
-	{ 1325000, 1225000, 1175000, 1075000,  975000,  950000,  925000,  925000 },	/* 8 */
+/* ASV table to work 1.7GHz in DVFS has 10 asv level. */
+static unsigned int s5pv310_asv_cpu_volt_table[10][CPUFREQ_LEVEL_END] = {
+	{ 1650000, 1550000, 1500000, 1400000, 1200000, 1100000, 1150000, 1150000, 1100000 },	/* 0 */
+	{ 1550000, 1450000, 1400000, 1300000, 1200000, 1100000, 1050000, 1050000, 1000000 },	/* 1 */
+	{ 1500000, 1400000, 1350000, 1250000, 1150000, 1050000, 1000000, 1000000, 950000 },	/* 2 */
+	{ 1450000, 1350000, 1300000, 1200000, 1100000, 1000000,  975000,  975000, 950000 },	/* 3 */
+	{ 1425000, 1325000, 1275000, 1175000, 1075000,  975000,  950000,  950000, 925000 },	/* 4 */
+	{ 1400000, 1300000, 1250000, 1150000, 1050000,  975000,  950000,  950000, 925000 },	/* 5 */
+	{ 1400000, 1300000, 1250000, 1150000, 1050000,  975000,  925000,  925000, 925000 },	/* 6 */
+	{ 1350000, 1250000, 1200000, 1100000, 1000000,  975000,  925000,  925000, 925000 },	/* 7 */
+	{ 1325000, 1225000, 1175000, 1075000,  975000,  950000,  925000,  925000, 925000 },	/* 8 */
+	{ 1325000, 1225000, 1175000, 1075000,  975000,  950000,  925000,  925000, 925000 },	/* 9 */
 };
 
 /* level 1 and 2 of vdd_int uses the same voltage value in U1 project */
-static unsigned int asv_int_volt_table[9][LV_END] = {
+static unsigned int asv_int_volt_table[10][LV_END] = {
 	{ 1250000, 1150000, 1150000 },	/* 0 */
 	{ 1150000, 1050000, 1050000 },	/* 1 */
 	{ 1125000, 1025000, 1025000 },	/* 2 */
@@ -400,6 +410,7 @@ static unsigned int asv_int_volt_table[9][LV_END] = {
 	{ 1075000, 975000, 975000 },	/* 6 */
 	{ 1075000, 975000, 975000 },	/* 7 */
 	{ 1050000, 950000, 950000 },	/* 8 */
+	{ 1050000, 950000, 950000 },	/* 9 */
 };
 
 static struct cpufreq_voltage_table s5pv310_volt_table[CPUFREQ_LEVEL_END] = {
@@ -439,6 +450,10 @@ static struct cpufreq_voltage_table s5pv310_volt_table[CPUFREQ_LEVEL_END] = {
 		.index		= L8,
 		.arm_volt	= 975000,
 		.int_volt	= 1000000,
+	}, {
+		.index		= L9,
+		.arm_volt	= 975000,
+		.int_volt	= 1000000,
 	},
 };
 static unsigned int s5pv310_apll_pms_table[CPUFREQ_LEVEL_END] = {
@@ -468,6 +483,9 @@ static unsigned int s5pv310_apll_pms_table[CPUFREQ_LEVEL_END] = {
 
 	/* APLL FOUT L8: 100MHz */
 	((200<<16)|(6<<8)|(0x4)),
+
+	/* APLL FOUT L9: 50MHz */
+	((100<<16)|(6<<8)|(0x4)),
 };
 
 int s5pv310_verify_policy(struct cpufreq_policy *policy)
@@ -1001,16 +1019,17 @@ static unsigned int get_ppc_load(void)
 }
 
 static unsigned int is_busfreq_static = 0;
-int busfreq_static_level[9] = { 
+int busfreq_static_level[10] = { 
 	0, //1704Mhz
 	0, //1600Mhz
 	0, //1400Mhz
 	0, //1200Mhz
 	0, //1000Mhz
-	1, // 800Mhz
-	1, // 500Mhz
-	2,  // 200Mhz
-	2,  // 100Mhz
+	1, //800Mhz
+	1, //500Mhz
+	2,  //200Mhz
+	2,  //100Mhz
+	2,  //50Mhz
 };
 
 static int busload_observor(struct busfreq_table *freq_table,
@@ -1855,6 +1874,9 @@ static int s5pv310_asv_table_update(void)
 		case 8:
 			/* s5pv310_volt_table[i].arm_volt */ exp_UV_mV[i] -= (125*1000);
 			break;
+		case 9:
+			/* s5pv310_volt_table[i].arm_volt */ exp_UV_mV[i] -= (125*1000);
+			break;
 		}
 		/* Maximum Voltage */
 /*		if (s5pv310_volt_table[i].arm_volt > 1450000)
@@ -1904,6 +1926,10 @@ static int s5pv310_asv_table_update(void)
 		/* s5pv310_volt_table[last_level].arm_volt */ exp_UV_mV[last_level] -= (50*1000);
 		/* s5pv310_volt_table[last_level].arm_volt */ exp_UV_mV[last_level+1] -= (50*1000);
 		break;
+	case 9:
+		/* s5pv310_volt_table[last_level].arm_volt */ exp_UV_mV[last_level] -= (50*1000);
+		/* s5pv310_volt_table[last_level].arm_volt */ exp_UV_mV[last_level+1] -= (50*1000);
+		break;
 	}
 	printk(KERN_INFO "ASV voltage_table[%d].arm_volt = %d\n",
 		last_level, exp_UV_mV[last_level]);
@@ -1932,6 +1958,9 @@ static int s5pv310_asv_table_update(void)
 		case 8:
 			s5pv310_busfreq_table[i].volt -= (50*1000);
 			break;
+		case 9:
+			s5pv310_busfreq_table[i].volt -= (50*1000);
+			break;
 		}
 
 		if (s5pv310_busfreq_table[i].volt < 950000)
@@ -1958,9 +1987,9 @@ static void s5pv310_asv_set_voltage(void)
 
 	freqs.old = s5pv310_getspeed(0);
 
-	for(asv_arm_index=0;asv_arm_index<9;asv_arm_index++)
+	for(asv_arm_index=0;asv_arm_index<10;asv_arm_index++)
 		if(freqs.old == s5pv310_freq_table[asv_arm_index].frequency) break;
-	if(asv_arm_index==9) asv_arm_index = 2; //should never happen, but just in case
+	if(asv_arm_index==10) asv_arm_index = 2; //should never happen, but just in case
 			
 
 //	if (s5pv310_max_armclk != ARMCLOCK_1704MHZ)
@@ -2393,8 +2422,14 @@ ssize_t set_freq_table(unsigned char step, unsigned int freq)
 			s5pv310_apll_pms_table[step] =	((pll<<16)|(6<<8)|(0x3));
 			s5pv310_freq_table[step].frequency = pll * 1 * 1000;	
 			break;
-		case 9: //100
-			if(freq >   200 || freq <   25) return -EINVAL;
+		case 8: //100
+			if(freq >   200 || freq <   50) return -EINVAL;
+			pll = (int)(freq * 2);
+			s5pv310_apll_pms_table[step] =	((pll<<16)|(6<<8)|(0x4));
+			s5pv310_freq_table[step].frequency = pll * 500;	
+			break;
+		case 9: //50
+			if(freq >   100 || freq <   25) return -EINVAL;
 			pll = (int)(freq * 2);
 			s5pv310_apll_pms_table[step] =	((pll<<16)|(6<<8)|(0x4));
 			s5pv310_freq_table[step].frequency = pll * 500;	
@@ -2406,12 +2441,12 @@ ssize_t set_freq_table(unsigned char step, unsigned int freq)
 }
 
 ssize_t show_freq_table(struct cpufreq_policy *policy, char *buf) {
-      return sprintf(buf, "%d %d %d %d %d %d %d %d %d", 
+      return sprintf(buf, "%d %d %d %d %d %d %d %d %d %d", 
 		s5pv310_freq_table[0].frequency/1000,s5pv310_freq_table[1].frequency/1000,
 		s5pv310_freq_table[2].frequency/1000,s5pv310_freq_table[3].frequency/1000,
 		s5pv310_freq_table[4].frequency/1000,s5pv310_freq_table[5].frequency/1000,
 		s5pv310_freq_table[6].frequency/1000,s5pv310_freq_table[7].frequency/1000,
-		s5pv310_freq_table[8].frequency/1000);
+		s5pv310_freq_table[8].frequency/1000,s5pv310_freq_table[9].frequency/1000);
 }
 
 
@@ -2419,12 +2454,12 @@ ssize_t store_freq_table(struct cpufreq_policy *policy,
                                       const char *buf, size_t count) {
 
 	unsigned int ret = -EINVAL;
-	int i = 0,max,min,u[9], p[9];
-	ret = sscanf(buf, "%d %d %d %d %d %d %d %d %d", 
-		&u[0], &u[1], &u[2], &u[3], &u[4], &u[5], &u[6], &u[7], &u[8]);
-	if(ret != 9)
+	int i = 0,max,min,u[10], p[10];
+	ret = sscanf(buf, "%d %d %d %d %d %d %d %d %d %d", 
+		&u[0], &u[1], &u[2], &u[3], &u[4], &u[5], &u[6], &u[7], &u[8], &u[9]);
+	if(ret != 10)
 		return -EINVAL;
-	for(i=0;i<8;i++)
+	for(i=0;i<9;i++)
 		if(u[i]<=u[i+1]) return -EINVAL;
 /*
 	((250<<16)|(6<<8)|(0x1)),
@@ -2432,15 +2467,15 @@ ssize_t store_freq_table(struct cpufreq_policy *policy,
 	((250<<16)|(6<<8)|(0x2)),
 	((200<<16)|(6<<8)|(0x3)),
 	((100<<16)|(6<<8)|(0x3)),*/
-	for(i=0;i<9;i++) if(s5pv310_freq_table[i].frequency==policy->max) break;
+	for(i=0;i<10;i++) if(s5pv310_freq_table[i].frequency==policy->max) break;
 	max = i;
-	for(i=0;i<9;i++) if(s5pv310_freq_table[i].frequency==policy->min) break;
+	for(i=0;i<10;i++) if(s5pv310_freq_table[i].frequency==policy->min) break;
 	min = i;
 	policy->max = policy->min = s5pv310_freq_table[L3].frequency;
 //	ret = cpufreq_driver_target(policy,
 //		s5pv310_freq_table[L4].frequency, DISABLE_FURTHER_CPUFREQ);
 
-	for(i=0;i<8;i++) {
+	for(i=0;i<9;i++) {
 		if(set_freq_table(i, u[i])!=-EINVAL) 
 			abyss_freq_table[i] = u[i];
 	}
@@ -2448,7 +2483,7 @@ ssize_t store_freq_table(struct cpufreq_policy *policy,
 	policy->max = s5pv310_freq_table[max].frequency;
 	policy->min = s5pv310_freq_table[min].frequency;
 	policy->cpuinfo.max_freq = s5pv310_freq_table[0].frequency;
-	policy->cpuinfo.min_freq = s5pv310_freq_table[8].frequency;
+	policy->cpuinfo.min_freq = s5pv310_freq_table[9].frequency;
 //	ret = cpufreq_driver_target(policy,
 //		s5pv310_freq_table[L4].frequency, ENABLE_FURTHER_CPUFREQ);	
 
@@ -2459,7 +2494,7 @@ ssize_t show_UV_mV_table(struct cpufreq_policy *policy, char *buf) {
 
       return sprintf(buf, 
 "%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n\
-%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n", 
+%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n", 
 		s5pv310_freq_table[0].frequency/1000,exp_UV_mV[0]/1000,
 		s5pv310_freq_table[1].frequency/1000,exp_UV_mV[1]/1000,
 		s5pv310_freq_table[2].frequency/1000,exp_UV_mV[2]/1000,
@@ -2468,7 +2503,8 @@ ssize_t show_UV_mV_table(struct cpufreq_policy *policy, char *buf) {
 		s5pv310_freq_table[5].frequency/1000,exp_UV_mV[5]/1000,
 		s5pv310_freq_table[6].frequency/1000,exp_UV_mV[6]/1000,
 		s5pv310_freq_table[7].frequency/1000,exp_UV_mV[7]/1000,
-		s5pv310_freq_table[8].frequency/1000,exp_UV_mV[8]/1000);
+		s5pv310_freq_table[8].frequency/1000,exp_UV_mV[8]/1000,
+		s5pv310_freq_table[9].frequency/1000,exp_UV_mV[9]/1000);
 }
 
 ssize_t store_UV_mV_table(struct cpufreq_policy *policy,
@@ -2476,16 +2512,16 @@ ssize_t store_UV_mV_table(struct cpufreq_policy *policy,
 
       unsigned int ret = -EINVAL;
       int i = 0;
-	  int u[9];
-      ret = sscanf(buf, "%d %d %d %d %d %d %d %d %d", &u[0], &u[1], &u[2], &u[3], &u[4], &u[5], &u[6], &u[7], &u[8]);
-	  if(ret != 9) {
-	      ret = sscanf(buf, "%d %d %d %d %d %d %d %d", &u[0], &u[1], &u[2], &u[3], &u[4], &u[5], &u[6],&u[7]);
-		  if(ret != 8) {
-		      ret = sscanf(buf, "%d %d %d %d %d %d %d", &u[1], &u[2], &u[3], &u[4], &u[5], &u[6], &u[7]);
-			  if( ret != 7) return -EINVAL;
+	  int u[10];
+      ret = sscanf(buf, "%d %d %d %d %d %d %d %d %d %d %d", &u[0], &u[1], &u[2], &u[3], &u[4], &u[5], &u[6], &u[7], &u[8], &u[9]);
+	  if(ret != 10) {
+	      ret = sscanf(buf, "%d %d %d %d %d %d %d %d %d", &u[0], &u[1], &u[2], &u[3], &u[4], &u[5], &u[6],&u[7], &u[8]);
+		  if(ret != 9) {
+		      ret = sscanf(buf, "%d %d %d %d %d %d %d %d", &u[1], &u[2], &u[3], &u[4], &u[5], &u[6], &u[7], &u[8]);
+			  if( ret != 8) return -EINVAL;
 		  }
 	  }
-		for( i = 0; i < 9; i++ )
+		for( i = 0; i < 10; i++ )
 		{
 			if (u[i] > CPU_UV_MV_MAX / 1000)
 			{
@@ -2505,6 +2541,7 @@ ssize_t store_UV_mV_table(struct cpufreq_policy *policy,
 		exp_UV_mV[6] = u[6] * 1000;
 		exp_UV_mV[7] = u[7] * 1000;
 		exp_UV_mV[8] = u[8] * 1000;
+		exp_UV_mV[9] = u[9] * 1000;
 		return count;
 }
 
@@ -2514,7 +2551,7 @@ ssize_t show_cpu_class(struct cpufreq_policy *policy, char *buf) {
 
 ssize_t show_busfreq_static(struct cpufreq_policy *policy, char *buf) {
       return sprintf(buf, 
-"%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n\
+"%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n\
 %dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n%dmhz: %d mV\n\n\
 bus frequency static mode: %s\n\
 You can echo the frequency step values to this file or 'enable'/'disable' status.\n\
@@ -2528,6 +2565,7 @@ Valid frequency step values are: 0 (400MHz), 1 (266MHz), 2 (133MHz)",
 		s5pv310_freq_table[6].frequency/1000,busfreq_static_level[6],
 		s5pv310_freq_table[7].frequency/1000,busfreq_static_level[7],
 		s5pv310_freq_table[8].frequency/1000,busfreq_static_level[8],
+		s5pv310_freq_table[9].frequency/1000,busfreq_static_level[9],
 		(is_busfreq_static ? "enabled" : "disabled")
 		);
 }
@@ -2536,7 +2574,7 @@ ssize_t store_busfreq_static(struct cpufreq_policy *policy,
                                       const char *buf, size_t count) {
 
 	unsigned int ret = -EINVAL;
-	int i = 0,max,min,u[9], p[9];
+	int i = 0,max,min,u[10], p[10];
 	
 	if(!strncmp(buf,"enabled",7)) {
 		is_busfreq_static = 1;
@@ -2547,14 +2585,14 @@ ssize_t store_busfreq_static(struct cpufreq_policy *policy,
 		return count;
 	}
 	
-	ret = sscanf(buf, "%d %d %d %d %d %d %d %d %d", 
-		&u[0], &u[1], &u[2], &u[3], &u[4], &u[5], &u[6], &u[7], &u[8]);
-	if(ret != 9)
+	ret = sscanf(buf, "%d %d %d %d %d %d %d %d %d %d", 
+		&u[0], &u[1], &u[2], &u[3], &u[4], &u[5], &u[6], &u[7], &u[8], &u[9]);
+	if(ret != 10)
 		return -EINVAL;
-	for(i=0;i<9;i++) {
+	for(i=0;i<10;i++) {
 		if(u[i]>2 || u[i]<0) return -EINVAL;
 	}
-	for(i=0;i<9;i++) {
+	for(i=0;i<10;i++) {
 		busfreq_static_level[i] = u[i];
 	}
 	return count;

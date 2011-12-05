@@ -91,6 +91,8 @@ const_debug unsigned int sysctl_sched_migration_cost = 500000UL;
 
 static const struct sched_class fair_sched_class;
 
+static unsigned long __read_mostly max_load_balance_interval = HZ/10;
+
 /**************************************************************
  * CFS operations on generic schedulable entities:
  */
@@ -802,6 +804,8 @@ static void clear_buddies(struct cfs_rq *cfs_rq, struct sched_entity *se)
 static void
 dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 {
+	u64 min_vruntime;
+
 	/*
 	 * Update run-time statistics of the 'current'.
 	 */
@@ -871,6 +875,9 @@ check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 	if (cfs_rq->nr_running > 1) {
 		struct sched_entity *se = __pick_next_entity(cfs_rq);
 		s64 delta = curr->vruntime - se->vruntime;
+
+		if (delta < 0)
+		  return;
 
 		if (delta > ideal_runtime)
 			resched_task(rq_of(cfs_rq)->curr);
@@ -1653,7 +1660,7 @@ static void check_preempt_wakeup(struct rq *rq, struct task_struct *p, int wake_
 	struct task_struct *curr = rq->curr;
 	struct sched_entity *se = &curr->se, *pse = &p->se;
 	struct cfs_rq *cfs_rq = task_cfs_rq(curr);
-	int scale = cfs_rq->nr_running >= sched_nr_latency;
+	int buddies = (cfs_rq->nr_running >= 2);
 
 	if (unlikely(rt_prio(p->prio)))
 		goto preempt;
@@ -1664,7 +1671,7 @@ static void check_preempt_wakeup(struct rq *rq, struct task_struct *p, int wake_
 	if (unlikely(se == pse))
 		return;
 
-	if (sched_feat(NEXT_BUDDY) && scale && !(wake_flags & WF_FORK))
+	if (sched_feat(NEXT_BUDDY) && buddies && !(wake_flags & WF_FORK))
 		set_next_buddy(pse);
 
 	/*
@@ -1710,7 +1717,7 @@ preempt:
 	if (unlikely(!se->on_rq || curr == rq->idle))
 		return;
 
-	if (sched_feat(LAST_BUDDY) && scale && entity_is_task(se))
+	if (sched_feat(LAST_BUDDY) && buddies && entity_is_task(se))
 		set_last_buddy(se);
 }
 
@@ -2333,6 +2340,11 @@ static void update_group_power(struct sched_domain *sd, int cpu)
 	struct sched_domain *child = sd->child;
 	struct sched_group *group, *sdg = sd->groups;
 	unsigned long power;
+	unsigned long interval;
+
+	interval = msecs_to_jiffies(sd->balance_interval);
+	interval = clamp(interval, 1UL, max_load_balance_interval);
+	sdg->next_update = jiffies + interval;
 
 	if (!child) {
 		update_cpu_power(sd, cpu);
@@ -2419,13 +2431,16 @@ static inline void update_sg_lb_stats(struct sched_domain *sd,
 	 * domains. In the newly idle case, we will allow all the cpu's
 	 * to do the newly idle load balance.
 	 */
-	if (idle != CPU_NEWLY_IDLE && local_group &&
-	    balance_cpu != this_cpu) {
-		*balance = 0;
-		return;
+	if (local_group) {
+		if (idle != CPU_NEWLY_IDLE) {
+			if (balance_cpu != this_cpu) {
+				*balance = 0;
+				return;
+			}
+			update_group_power(sd, this_cpu);
+		} else if (time_after_eq(jiffies, group->next_update))
+			update_group_power(sd, this_cpu);
 	}
-
-	update_group_power(sd, this_cpu);
 
 	/* Adjust by relative CPU power of the group */
 	sgs->avg_load = (sgs->group_load * SCHED_LOAD_SCALE) / group->cpu_power;
@@ -2531,6 +2546,12 @@ static inline void update_sd_lb_stats(struct sched_domain *sd, int this_cpu,
 		group = group->next;
 	} while (group != sd->groups);
 }
+
+int __weak arch_sd_sibling_asym_packing(void)
+{
+       return 0*SD_ASYM_PACKING;
+}
+
 
 /**
  * fix_small_imbalance - Calculate the minor imbalance that exists
@@ -3364,8 +3385,10 @@ void select_nohz_load_balancer(int stop_tick)
 
 	if (stop_tick) {
 		if (!cpu_active(cpu)) {
-			if (atomic_read(&nohz.load_balancer) != cpu)
+			if (atomic_read(&nohz.load_balancer) != cpu) {
+				cpumask_clear_cpu(cpu, nohz.idle_cpus_mask);
 				return;
+			}
 
 			/*
 			 * If we are going offline and still the leader,
@@ -3375,6 +3398,7 @@ void select_nohz_load_balancer(int stop_tick)
 					   nr_cpu_ids) != cpu)
 				BUG();
 
+			cpumask_clear_cpu(cpu, nohz.idle_cpus_mask);
 			return;
 		}
 
@@ -3423,6 +3447,15 @@ void select_nohz_load_balancer(int stop_tick)
 static DEFINE_SPINLOCK(balancing);
 
 /*
+ * Scale the max load_balance interval with the number of CPUs in the system.
+ * This trades load-balance latency on larger machines for less cross talk.
+ */
+static void update_max_interval(void)
+{
+	max_load_balance_interval = HZ*num_online_cpus()/10;
+}
+
+/*
  * It checks each scheduling domain to see if it is due to be balanced,
  * and initiates a balancing operation if so.
  *
@@ -3449,10 +3482,7 @@ static void rebalance_domains(int cpu, enum cpu_idle_type idle)
 
 		/* scale ms to jiffies */
 		interval = msecs_to_jiffies(interval);
-		if (unlikely(!interval))
-			interval = 1;
-		if (interval > HZ*NR_CPUS/10)
-			interval = HZ*NR_CPUS/10;
+		interval = clamp(interval, 1UL, max_load_balance_interval);
 
 		need_serialize = sd->flags & SD_SERIALIZE;
 

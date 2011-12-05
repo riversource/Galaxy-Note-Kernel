@@ -29,6 +29,7 @@
 #include <asm/cacheflush.h>
 #include <asm/cpu.h>
 #include <asm/cputype.h>
+#include <asm/topology.h>
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -71,7 +72,7 @@ int __cpuinit __cpu_up(unsigned int cpu)
 {
 	struct cpuinfo_arm *ci = &per_cpu(cpu_data, cpu);
 	struct task_struct *idle = ci->idle;
-	static pgd_t *pgd[CONFIG_NR_CPUS];
+	pgd_t *pgd;
 	pmd_t *pmd;
 	int ret;
 
@@ -100,8 +101,8 @@ int __cpuinit __cpu_up(unsigned int cpu)
 	 * of our "standard" page tables, with the addition of
 	 * a 1:1 mapping for the physical address of the kernel.
 	 */
-	pgd[cpu] = pgd[cpu] ?: pgd_alloc(&init_mm);
-	pmd = pmd_offset(pgd[cpu] + pgd_index(PHYS_OFFSET), PHYS_OFFSET);
+	pgd = pgd_alloc(&init_mm);
+	pmd = pmd_offset(pgd + pgd_index(PHYS_OFFSET), PHYS_OFFSET);
 	*pmd = __pmd((PHYS_OFFSET & PGDIR_MASK) |
 		     PMD_TYPE_SECT | PMD_SECT_AP_WRITE);
 	flush_pmd_entry(pmd);
@@ -112,7 +113,7 @@ int __cpuinit __cpu_up(unsigned int cpu)
 	 * its stack and the page tables.
 	 */
 	secondary_data.stack = task_stack_page(idle) + THREAD_START_SP;
-	secondary_data.pgdir = virt_to_phys(pgd[cpu]);
+	secondary_data.pgdir = virt_to_phys(pgd);
 	__cpuc_flush_dcache_area(&secondary_data, sizeof(secondary_data));
 	outer_clean_range(__pa(&secondary_data), __pa(&secondary_data + 1));
 
@@ -145,7 +146,7 @@ int __cpuinit __cpu_up(unsigned int cpu)
 
 	*pmd = __pmd(0);
 	clean_pmd_entry(pmd);
-	/* pgd_free(&init_mm, pgd); */
+	pgd_free(&init_mm, pgd);
 
 	if (ret) {
 		printk(KERN_CRIT "CPU%u: processor failed to boot\n", cpu);
@@ -314,8 +315,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 	 * OK, now it's safe to let the boot CPU continue
 	 */
 	set_cpu_online(cpu, true);
-	while (!cpu_active(cpu))
-		cpu_relax();
 
 	/*
 	 * OK, it's off to the idle thread for us
@@ -332,6 +331,8 @@ void __cpuinit smp_store_cpu_info(unsigned int cpuid)
 	struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpuid);
 
 	cpu_info->loops_per_jiffy = loops_per_jiffy;
+
+	store_cpu_topology(cpuid);
 }
 
 void __init smp_cpus_done(unsigned int max_cpus)
@@ -493,9 +494,6 @@ static void ipi_cpu_stop(unsigned int cpu)
 
 	local_fiq_disable();
 	local_irq_disable();
-
-	flush_cache_all();
-	local_flush_tlb_all();
 
 	while (1)
 		cpu_relax();
