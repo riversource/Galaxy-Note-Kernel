@@ -1095,10 +1095,8 @@ static void drain_pages(unsigned int cpu)
 		pset = per_cpu_ptr(zone->pageset, cpu);
 
 		pcp = &pset->pcp;
-		if (pcp->count) {
-		  free_pcppages_bulk(zone, pcp->count, pcp);
-		  pcp->count = 0;
-		}
+		free_pcppages_bulk(zone, pcp->count, pcp);
+		pcp->count = 0;
 		local_irq_restore(flags);
 	}
 }
@@ -1997,6 +1995,7 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	unsigned long pages_reclaimed = 0;
 	unsigned long did_some_progress;
 	struct task_struct *p = current;
+	unsigned long start_tick = jiffies;
 
 	/*
 	 * In the slowpath, we sanity check order to avoid ever trying to
@@ -2080,8 +2079,9 @@ rebalance:
 	/*
 	 * If we failed to make any progress reclaiming, then we are
 	 * running out of options and have to consider going OOM
+	 * If we are looping more than 1 second, go to OOM
 	 */
-	if (!did_some_progress) {
+	if (!did_some_progress || time_after(jiffies, start_tick + HZ)) {
 		if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY)) {
 			if (oom_killer_disabled)
 				goto nopage;
@@ -2595,16 +2595,9 @@ static int __parse_numa_zonelist_order(char *s)
 
 static __init int setup_numa_zonelist_order(char *s)
 {
-	int ret;
-
-	if (!s)
-	  return 0;
-
-	ret = __parse_numa_zonelist_order(s);
-	if (ret == 0)
-	  strlcpy(numa_zonelist_order, s, NUMA_ZONELIST_ORDER_LEN);
-
-	return ret;
+	if (s)
+		return __parse_numa_zonelist_order(s);
+	return 0;
 }
 early_param("numa_zonelist_order", setup_numa_zonelist_order);
 

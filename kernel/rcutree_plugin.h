@@ -154,7 +154,7 @@ static void rcu_preempt_note_context_switch(int cpu)
 	    (t->rcu_read_unlock_special & RCU_READ_UNLOCK_BLOCKED) == 0) {
 
 		/* Possibly blocking in an RCU read-side critical section. */
-		rdp = per_cpu_ptr(rcu_preempt_state.rda, cpu);
+		rdp = rcu_preempt_state.rda[cpu];
 		rnp = rdp->mynode;
 		raw_spin_lock_irqsave(&rnp->lock, flags);
 		t->rcu_read_unlock_special |= RCU_READ_UNLOCK_BLOCKED;
@@ -415,16 +415,6 @@ static void rcu_print_task_stall(struct rcu_node *rnp)
 		list_for_each_entry(t, lp, rcu_node_entry)
 			printk(" P%d", t->pid);
 	}
-}
-
-/*
- * Suppress preemptible RCU's CPU stall warnings by pushing the
- * time of the next stall-warning message comfortably far into the
- * future.
- */
-static void rcu_preempt_stall_reset(void)
-{
-	rcu_preempt_state.jiffies_stall = jiffies + ULONG_MAX / 2;
 }
 
 #endif /* #ifdef CONFIG_RCU_CPU_STALL_DETECTOR */
@@ -781,7 +771,7 @@ static void rcu_preempt_send_cbs_to_orphanage(void)
  */
 static void __init __rcu_init_preempt(void)
 {
-	rcu_init_one(&rcu_preempt_state, &rcu_preempt_data);
+	RCU_INIT_FLAVOR(&rcu_preempt_state, rcu_preempt_data);
 }
 
 /*
@@ -872,14 +862,6 @@ static void rcu_print_detail_task_stall(struct rcu_state *rsp)
  * tasks blocked within RCU read-side critical sections.
  */
 static void rcu_print_task_stall(struct rcu_node *rnp)
-{
-}
-
-/*
- * Because preemptible RCU does not exist, there is no need to suppress
- * its CPU stall warnings.
- */
-static void rcu_preempt_stall_reset(void)
 {
 }
 

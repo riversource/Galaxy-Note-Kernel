@@ -166,10 +166,8 @@ static int suspend_enter(suspend_state_t state)
 
 	error = sysdev_suspend(PMSG_SUSPEND);
 	if (!error) {
-		if (!suspend_test(TEST_CORE) && pm_check_wakeup_events()) {
+		if (!suspend_test(TEST_CORE))
 			error = suspend_ops->enter(state);
-			events_check_enabled = false;
-		}
 		/* Workaround for possible L2 cache coherency issue
 		   where preempt_count remains zero */ 
 		preempt_count() = 0;
@@ -225,7 +223,7 @@ int suspend_devices_and_enter(suspend_state_t state)
 	if (suspend_test(TEST_DEVICES))
 		goto Recover_platform;
 
-	error = suspend_enter(state);
+	suspend_enter(state);
 
  Resume_devices:
 	suspend_test_start();

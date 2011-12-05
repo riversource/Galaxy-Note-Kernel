@@ -1385,8 +1385,6 @@ struct super_block {
 	 * generic_show_options()
 	 */
 	char *s_options;
-	
-	int cleancache_poolid;
 };
 
 extern struct timespec current_fs_time(struct super_block *sb);
@@ -2106,16 +2104,8 @@ extern int __filemap_fdatawrite_range(struct address_space *mapping,
 extern int filemap_fdatawrite_range(struct address_space *mapping,
 				loff_t start, loff_t end);
 
-#ifdef CONFIG_FILE_SYNC_DISABLE
-static inline int
-vfs_fsync_range(struct file *file, loff_t start, loff_t end, int datasync)
-{
-	return 0;
-}
-#else
 extern int vfs_fsync_range(struct file *file, loff_t start, loff_t end,
 			   int datasync);
-#endif
 extern int vfs_fsync(struct file *file, int datasync);
 extern int generic_write_sync(struct file *file, loff_t pos, loff_t count);
 extern void sync_supers(void);

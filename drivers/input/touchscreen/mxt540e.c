@@ -910,10 +910,10 @@ static irqreturn_t mxt540e_irq_thread(int irq, void *ptr)
 			if (msg[4] == 5) { /* Median filter error */
 				printk("[TSP] Median filter Error\n");
 				get_object_info(data, PROCG_NOISESUPPRESSION_T48, &size, &obj_address);
-				value = data->calcfg_batt_e;
+				value = 0;
 				error = write_mem(data, obj_address+2, 1, &value);
-				msleep(5);
-				value |= 0x20;
+				msleep(15);
+				value = data->calcfg_batt_e;
 				error |= write_mem(data, obj_address+2, 1, &value);
 				if(error) printk(KERN_ERR "[TSP] failed to reenable CHRGON\n");
 			}

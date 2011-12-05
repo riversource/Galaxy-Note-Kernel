@@ -1717,7 +1717,7 @@ void s5p_rp_late_resume(struct early_suspend *h)
  * The functions for inserting/removing us as a module.
  */
 
-static int s5p_rp_probe(struct platform_device *pdev)
+static int __init s5p_rp_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	int ret;

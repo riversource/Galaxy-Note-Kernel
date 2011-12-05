@@ -23,12 +23,6 @@ config CONSTRUCTORS
 
 menu "General setup"
 
-config GPU_UNDERVOLTING
-	bool "gpu undervolting"
-	default n
-	help
-	 enable undervolting. if unsure, say n.
-
 config EXPERIMENTAL
 	bool "Prompt for development and/or incomplete code/drivers"
 	---help---
@@ -340,15 +334,6 @@ choice
 	prompt "RCU Implementation"
 	default TREE_RCU
 
-config CLASSIC_RCU
-	bool "Classic RCU"
-	help
-	This option selects the classic RCU implementation that is
-	designed for best read-side performance on non-realtime
-	systems.
-
-	Select this option if you are unsure.
-
 config TREE_RCU
 	bool "Tree-based hierarchical RCU"
 	help
@@ -376,70 +361,7 @@ config TINY_RCU
 	  is not required.  This option greatly reduces the
 	  memory footprint of RCU.
 
-config JRCU
-       bool "A tiny single-CPU RCU for small SMP systems"
-       depends on PREEMPT
-       depends on SMP
-       select PREEMPT_COUNT_CPU
-       help
-         This option selects a minimal-footprint RCU suitable for small SMP
-         systems -- that is, those with fewer than 16 or perhaps 32, and
-         certainly less than 64 processors.
-
-         This RCU variant may be a good choice for systems with low latency
-         requirements.  It does RCU garbage collection from a single CPU
-         rather than have each CPU do its own.  This frees up all but one
-         CPU from interference by this periodic requirement.
-
-         Most users should say N here.
-
 endchoice
-
-config JRCU_DAEMON
-       bool
-       depends on JRCU
-       default y
-       help
-         Required. The context switch when leaving the daemon is needed
-         to get the CPU to reliably participate in end-of-batch processing.
-
-config JRCU_DAEMON_PRIO
-       int "JRCU Daemon priority"
-       depends on JRCU_DAEMON
-       default 0
-       help
-         The JRCU daemon priority. If 0 then the daemon runs SCHED_OTHER.
-         If >0 then the daemon runs SCHED_RR and its priority will be
-         the value selected.  If <0 then SCHED_RR is again selected, but
-         now its priority will be the biased downwards from the maximum
-         possible Posix priority.
-
-config JRCU_LAZY
-       bool "Should JRCU be lazy recognizing end-of-batch"
-       depends on JRCU
-       default n
-       help
-         If you say Y here, JRCU will on occasion fail to recognize
-         end-of-batch for an rcu period or two.
-
-         If you say N here, JRCU will be more aggressive; in fact it
-         will always recognize end-of-batch at the earliest possible time.
-
-         Being lazy should be fractionally more efficient in that JRCU
-         inserts fewer memory barriers along some high performance kernel
-         code paths.
-
-         If unsure, say N.
-
-config PREEMPT_COUNT_CPU
-       # bool "Let one CPU look at another CPUs preemption count"
-       bool
-       default n
-       help
-         If Y then the preempt_count_cpu() function will be compiled into
-         the kernel.  Its existance impacts kernel performance slightly,
-         so this option should be selected only if other kernel features
-         that use preempt_count_cpu() are also selected.
 
 config RCU_TRACE
 	bool "Enable tracing for RCU"
@@ -589,16 +511,6 @@ config CGROUP_FREEZER
 	help
 	  Provides a way to freeze and unfreeze all tasks in a
 	  cgroup.
-
-config CGROUP_TIMER_SLACK
-	tristate "Timer slack cgroup subsystem"
-	help
-	  Provides a way of tasks grouping by timer slack value.
-	  Introduces per cgroup timer slack value which will override
-	  the default timer slack value once a task is attached to a
-	  cgroup.
-	  It's useful in mobile devices where certain background apps
-	  are attached to a cgroup and combined wakeups are desired.
 
 config CGROUP_DEVICE
 	bool "Device controller for cgroups"

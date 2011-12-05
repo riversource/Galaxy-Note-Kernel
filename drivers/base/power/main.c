@@ -67,7 +67,6 @@ void device_pm_init(struct device *dev)
 	dev->power.status = DPM_ON;
 	init_completion(&dev->power.completion);
 	complete_all(&dev->power.completion);
-	dev->power.wakeup_count = 0;
 	pm_runtime_init(dev);
 }
 
@@ -306,7 +305,7 @@ static int pm_noirq_op(struct device *dev,
 			pm_message_t state)
 {
 	int error = 0;
-	ktime_t calltime = { .tv64 = 0 }, delta, rettime;
+	ktime_t calltime, delta, rettime;
 
 	if (initcall_debug) {
 		pr_info("calling  %s+ @ %i, parent: %s\n",
