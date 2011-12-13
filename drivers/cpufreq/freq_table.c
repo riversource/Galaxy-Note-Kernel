@@ -14,8 +14,7 @@
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 
-#define dprintk(msg...) \
-	cpufreq_debug_printk(CPUFREQ_DEBUG_CORE, "freq-table", msg)
+#define dprintk(msg...) //cpufreq_debug_printk(CPUFREQ_DEBUG_CORE, "freq-table", msg)
 
 /*********************************************************************
  *                     FREQUENCY TABLE HELPERS                       *

@@ -275,10 +275,7 @@ extern cpumask_var_t nohz_cpu_mask;
 extern void select_nohz_load_balancer(int stop_tick);
 extern int get_nohz_load_balancer(void);
 #else
-static inline void select_nohz_load_balancer(int stop_tick)
-{
-	return 0;
-}
+static inline void select_nohz_load_balancer(int stop_tick) { }
 #endif
 extern int get_nohz_timer_target(void);
 
@@ -344,6 +341,9 @@ extern unsigned long sysctl_hung_task_warnings;
 extern int proc_dohung_task_timeout_secs(struct ctl_table *table, int write,
 					 void __user *buffer,
 					 size_t *lenp, loff_t *ppos);
+#else
+/* Avoid need for ifdefs elsewhere in the code */
+enum { sysctl_hung_task_timeout_secs = 0 };
 #endif
 
 /* Attach to any functions which should be ignored in wchan output. */

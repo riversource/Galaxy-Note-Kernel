@@ -17,8 +17,6 @@
  *
  */
 
-#define DEBUG 1
-
 /* Control bluetooth power for Crespo platform */
 
 #include <linux/platform_device.h>
@@ -37,7 +35,7 @@
 #include <plat/gpio-cfg.h>
 #include <plat/irqs.h>
 
-/*#define BT_SLEEP_ENABLE*/
+#define BT_SLEEP_ENABLE
 
 #define IRQ_BT_HOST_WAKE      IRQ_EINT(22)
 
@@ -410,7 +408,7 @@ static struct platform_driver crespo_device_rfkill = {
 	},
 };
 
-static int __init crespo_rfkill_init(void)
+static int crespo_rfkill_init(void)
 {
 	int rc = 0;
 	rc = platform_driver_register(&crespo_device_rfkill);
