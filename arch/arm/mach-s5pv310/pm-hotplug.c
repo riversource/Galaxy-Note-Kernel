@@ -34,16 +34,34 @@
 #include <mach/regs-gpio.h>
 #include <mach/regs-irq.h>
 #include <linux/gpio.h>
+#include <linux/cpufreq.h>
 
-#include <linux/device.h>
-#include <linux/miscdevice.h>
+#include <linux/device.h> 		//for second_core by tegrak
+#include <linux/miscdevice.h> 	//for second_core by tegrak
 
 #define CPUMON 0
 
-
-#define CHECK_DELAY  (HZ >> 1)
+#ifdef CONFIG_BATTERY
+#define CHECK_DELAY	1 << 8
+#define TRANS_LOAD_L	20
+#define TRANS_LOAD_H	70
+#define TRANS_LOAD_L_SCREEN_OFF 40
+#define TRANS_LOAD_H_SCREEN_OFF 90
+#else
+#define CHECK_DELAY	(HZ >> 1)
 #define TRANS_LOAD_L	20
 #define TRANS_LOAD_H	(TRANS_LOAD_L*3)
+#define TRANS_LOAD_L_SCREEN_OFF 30
+#define TRANS_LOAD_H_SCREEN_OFF 80
+#endif
+
+#ifdef CONFIG_BATTERY
+#define CPU1_ON_FREQ 1 << 19
+#else
+#define CPU1_ON_FREQ 1 << 18
+#endif
+
+#define printk(arg...)
 
 #define HOTPLUG_UNLOCKED 0
 #define HOTPLUG_LOCKED 1
@@ -60,6 +78,10 @@ static unsigned int trans_load_l = TRANS_LOAD_L;
 module_param_named(loadl, trans_load_l, uint, 0644);
 static unsigned int trans_load_h = TRANS_LOAD_H;
 module_param_named(loadh, trans_load_h, uint, 0644);
+static unsigned int trans_load_l_off = TRANS_LOAD_L_SCREEN_OFF;
+module_param_named(loadl_scroff, trans_load_l_off, uint, 0644);
+static unsigned int trans_load_h_off = TRANS_LOAD_H_SCREEN_OFF;
+module_param_named(loadh_scroff, trans_load_h_off, uint, 0644);
 
 struct cpu_time_info {
 	cputime64_t prev_cpu_idle;
@@ -75,7 +97,7 @@ static bool screen_off;
    timer(softirq) context but in process context */
 static DEFINE_MUTEX(hotplug_lock);
 
-/* Second Core by Tegrak */
+/* Second core values by tegrak */
 #define SECOND_CORE_VERSION (1)
 int second_core_on = 1;
 int hotplug_on = 1;
@@ -83,19 +105,18 @@ int hotplug_on = 1;
 static void hotplug_timer(struct work_struct *work)
 {
 	unsigned int i, avg_load = 0, load = 0;
+	unsigned int cur_freq;
 
 	mutex_lock(&hotplug_lock);
 
+	// exit if we turned off dynamic hotplug by tegrak
+	// cancel the timer
 	if (!hotplug_on) {
 		if (!second_core_on && cpu_online(1) == 1)
 			cpu_down(1);
 		goto off_hotplug;
 	}
 
-	if (screen_off && !cpu_online(1)) {
-		printk(KERN_INFO "pm-hotplug: disable cpu auto-hotplug\n");
-		goto out;
-	}
 	if (user_lock == 1)
 		goto no_hotplug;
 
@@ -126,25 +147,42 @@ static void hotplug_timer(struct work_struct *work)
 
 	avg_load = load / num_online_cpus();
 
-	if (avg_load < trans_load_l && cpu_online(1)) {
+	cur_freq = cpufreq_get(0);
+
+	if ( ( 
+		  (avg_load < (screen_off ? trans_load_l_off : trans_load_l)) ||
+		  (cur_freq < CPU1_ON_FREQ )
+		 )
+		&& cpu_online(1) ) {
 		printk("cpu1 turning off!\n");
 		cpu_down(1);
+#if CPUMON
+		printk(KERN_ERR "CPUMON D %d\n", avg_load);
+#endif
 		printk("cpu1 off end!\n");
-		hotpluging_rate = CHECK_DELAY;
-	} else if (avg_load > trans_load_h && !cpu_online(1)) {
+		if(!screen_off) hotpluging_rate = CHECK_DELAY;
+	} else if ( (
+			(avg_load > (screen_off ? trans_load_h_off : trans_load_h)) &&
+			(cur_freq > CPU1_ON_FREQ )
+				) 
+		&& !cpu_online(1) ) {
 		printk("cpu1 turning on!\n");
 		cpu_up(1);
+#if CPUMON
+		printk(KERN_ERR "CPUMON U %d\n", avg_load);
+#endif
 		printk("cpu1 on end!\n");
+#ifndef CONFIG_SIYAH_SAFE_FEATURES
+		if(!screen_off) hotpluging_rate = CHECK_DELAY << 1;
+#else
 		hotpluging_rate = CHECK_DELAY * 4;
+#endif
 	}
- no_hotplug:
-	//printk("hotplug timer done.\n);
+no_hotplug:
+
 	queue_delayed_work_on(0, hotplug_wq, &hotplug_work, hotpluging_rate);
 
- off_hotplug:
-	mutex_unlock(&hotplug_lock);
-
-out:
+off_hotplug:
 	mutex_unlock(&hotplug_lock);
 }
 
@@ -193,12 +231,49 @@ static struct notifier_block hotplug_reboot_notifier = {
 	.notifier_call = hotplug_reboot_notifier_call,
 };
 
+static void hotplug_early_suspend(struct early_suspend *handler)
+{
+	mutex_lock(&hotplug_lock);
+	screen_off = true;
+#ifdef CONFIG_BATTERY
+	hotpluging_rate = CHECK_DELAY << 2;
+#endif
+	mutex_unlock(&hotplug_lock);
+}
+
+static void hotplug_late_resume(struct early_suspend *handler)
+{
+	printk(KERN_INFO "pm-hotplug: enable cpu auto-hotplug\n");
+
+	mutex_lock(&hotplug_lock);
+	screen_off = false;
+#ifdef CONFIG_BATTERY
+	hotpluging_rate = CHECK_DELAY << 1;
+#endif
+	//cpu_up(1); //when the screen is on, activate the second cpu no matter what the load is
+	queue_delayed_work_on(0, hotplug_wq, &hotplug_work, hotpluging_rate);
+	mutex_unlock(&hotplug_lock);
+}
+
+static struct early_suspend hotplug_early_suspend_notifier = {
+	.suspend = hotplug_early_suspend,
+	.resume = hotplug_late_resume,
+	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN,
+};
+
+/****************************************
+ * DEVICE ATTRIBUTES FUNCTION by tegrak
+****************************************/
 #define declare_show(filename) \
 	static ssize_t show_##filename(struct device *dev, struct device_attribute *attr, char *buf)
 
 #define declare_store(filename) \
-	static ssize_t store_##filename(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+	static ssize_t store_##filename(\
+		struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
 
+/****************************************
+ * second_core attributes function by tegrak
+ ****************************************/
 declare_show(version) {
 	return sprintf(buf, "%u\n", SECOND_CORE_VERSION);
 }
@@ -302,29 +377,6 @@ static struct miscdevice second_core_device = {
 		.name = "second_core",
 };
 
-static void hotplug_early_suspend(struct early_suspend *handler)
-{
-	mutex_lock(&hotplug_lock);
-	screen_off = true;
-	mutex_unlock(&hotplug_lock);
-}
-
-static void hotplug_late_resume(struct early_suspend *handler)
-{
-	printk(KERN_INFO "pm-hotplug: enable cpu auto-hotplug\n");
-	
-	mutex_lock(&hotplug_lock);
-	screen_off = false;
-	queue_delayed_work_on(0, hotplug_wq, &hotplug_work, hotpluging_rate);
-	mutex_unlock(&hotplug_lock);
-}
-
-static struct early_suspend hotplug_early_suspend_notifier = {
-	.suspend = hotplug_early_suspend,
-	.resume = hotplug_late_resume,
-	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN,
-};
-
 static int __init s5pv310_pm_hotplug_init(void)
 {
 	int ret;
@@ -337,7 +389,7 @@ static int __init s5pv310_pm_hotplug_init(void)
 
 	INIT_DELAYED_WORK_DEFERRABLE(&hotplug_work, hotplug_timer);
 
-	queue_delayed_work_on(0, hotplug_wq, &hotplug_work, 70 * HZ);
+	queue_delayed_work_on(0, hotplug_wq, &hotplug_work, 60 * HZ);
 
 	register_pm_notifier(&s5pv310_pm_hotplug_notifier);
 	register_reboot_notifier(&hotplug_reboot_notifier);
@@ -346,10 +398,10 @@ static int __init s5pv310_pm_hotplug_init(void)
 	// register second_core device by tegrak
 	ret = misc_register(&second_core_device);
 	if (ret) {
-		printk(KERN_ERR "failed at(%d)\n", __LINE__);
+	   printk(KERN_ERR "failed at(%d)\n", __LINE__);
 		return ret;
 	}
-	
+
 	ret = sysfs_create_group(&second_core_device.this_device->kobj, &second_core_group);
 	if (ret)
 	{

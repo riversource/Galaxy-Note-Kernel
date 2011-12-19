@@ -28,11 +28,8 @@
 #include <linux/cpu.h>
 #include <linux/completion.h>
 #include <linux/mutex.h>
-#include <linux/earlysuspend.h>
 
-
-#define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_CORE, \
-						"cpufreq-core", msg)
+#define dprintk(msg...) //cpufreq_debug_printk(CPUFREQ_DEBUG_CORE, "cpufreq-core", msg)
 
 /**
  * The "cpufreq driver" - the arch- or hardware-dependent low
@@ -692,10 +689,12 @@ cpufreq_freq_attr_rw(scaling_min_freq);
 cpufreq_freq_attr_rw(scaling_max_freq);
 cpufreq_freq_attr_rw(scaling_governor);
 cpufreq_freq_attr_rw(scaling_setspeed);
+#ifndef CONFIG_SIYAH_SAFE_FEATURES
 /* UV table */
 cpufreq_freq_attr_rw(UV_mV_table);
 /* freq table */
 cpufreq_freq_attr_rw(freq_table);
+#endif
 /* busfreq_static_level */
 cpufreq_freq_attr_rw(busfreq_static);
 //cpu class
@@ -713,8 +712,10 @@ static struct attribute *default_attrs[] = {
 	&scaling_driver.attr,
 	&scaling_available_governors.attr,
 	&scaling_setspeed.attr,
+#ifndef CONFIG_SIYAH_SAFE_FEATURES
 	&UV_mV_table.attr,
 	&freq_table.attr,
+#endif
 	&busfreq_static.attr,
 	&cpu_class.attr,
 	NULL
@@ -1045,18 +1046,28 @@ static int cpufreq_add_dev(struct sys_device *sys_dev)
 
 	/* Set governor before ->init, so that driver could check it */
 #ifdef CONFIG_HOTPLUG_CPU
+	struct cpufreq_policy *cp;
 	for_each_online_cpu(sibling) {
-		struct cpufreq_policy *cp = per_cpu(cpufreq_cpu_data, sibling);
+		cp = per_cpu(cpufreq_cpu_data, sibling);
 		if (cp && cp->governor &&
 		    (cpumask_test_cpu(cpu, cp->related_cpus))) {
+			dprintk("found sibling CPU, copying policy\n");
 			policy->governor = cp->governor;
+			policy->min = cp->min;
+			policy->max = cp->max;
+			policy->user_policy.min = cp->user_policy.min;
+			policy->user_policy.max = cp->user_policy.max;
 			found = 1;
 			break;
 		}
 	}
 #endif
 	if (!found)
+	{
+		dprintk("failed to find sibling CPU, falling back to defaults\n");
 		policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
+	}
+	
 	/* call driver. From then on the cpufreq must be able
 	 * to accept all calls to ->verify and ->setpolicy for this CPU
 	 */
@@ -1065,19 +1076,18 @@ static int cpufreq_add_dev(struct sys_device *sys_dev)
 		dprintk("initialization failed\n");
 		goto err_unlock_policy;
 	}
-#ifdef CONFIG_HOTPLUG_CPU
-	for_each_online_cpu(sibling) {
-		struct cpufreq_policy *cp = per_cpu(cpufreq_cpu_data, sibling);
-		if (cp && cp->governor &&
-		    (cpumask_test_cpu(cpu, cp->related_cpus))) {
-			policy->min = cp->min;
-			policy->max = cp->max;
-			break;
-		}
-	}
-#endif
 	policy->user_policy.min = policy->min;
 	policy->user_policy.max = policy->max;
+
+	if (found)
+	{
+		/* Calling the driver can overwrite policy frequencies again */
+		dprintk("Overriding policy max and min with sibling settings\n");
+		policy->min = cp->min;
+		policy->max = cp->max;
+		policy->user_policy.min = cp->user_policy.min;
+		policy->user_policy.max = cp->user_policy.max;
+	}
 
 	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
 				     CPUFREQ_START, policy);
@@ -1691,16 +1701,12 @@ int cpufreq_register_governor(struct cpufreq_governor *governor)
 	err = -EBUSY;
 	if (__find_governor(governor->name) == NULL) {
 		err = 0;
-		if (!strncmp(governor->name, "smartassV2", CPUFREQ_NAME_LEN)
-		|| !strncmp(governor->name, "smartass", CPUFREQ_NAME_LEN)
-		|| !strncmp(governor->name, "ondemand", CPUFREQ_NAME_LEN)
-		|| !strncmp(governor->name, "interactive", CPUFREQ_NAME_LEN)
-		|| !strncmp(governor->name, "interactiveX", CPUFREQ_NAME_LEN)
-		|| !strncmp(governor->name, "ondemandx", CPUFREQ_NAME_LEN)
-		|| !strncmp(governor->name, "conservative", CPUFREQ_NAME_LEN))
-			governor->disableScalingDuringSuspend = 1;
-		else
+		if (!strncmp(governor->name, "powersave", CPUFREQ_NAME_LEN)
+		|| !strncmp(governor->name, "performance", CPUFREQ_NAME_LEN)
+		)
 			governor->disableScalingDuringSuspend = 0;
+		else
+			governor->disableScalingDuringSuspend = 1;
 		list_add(&governor->governor_list, &cpufreq_governor_list);
 	}
 

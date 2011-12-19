@@ -541,6 +541,32 @@ config LOG_BUF_SHIFT
 		     13 =>  8 KB
 		     12 =>  4 KB
 
+config DEFAULT_CLOCK_LOW
+	int "default low clock"
+	range 100 1200
+	default 200
+	help
+	  default low frequency
+
+config DEFAULT_CLOCK_HIGH
+	int "default high clock"
+	range 500 1704
+	default 1400
+	help
+	  default high frequency
+
+config BATTERY
+	boolean "Safe features"
+	help
+	  Enable only safe to use features to prevent crashes.
+	  Say Y if unsure
+
+config ABYSSNOTE_FEATURES
+	boolean "Safe features"
+	help
+	  Enable only safe to use features to prevent crashes.
+	  Say Y if unsure
+
 #
 # Architectures with an unreliable sched_clock() should select this:
 #
@@ -735,6 +761,18 @@ config DEBUG_BLK_CGROUP
 	files in a cgroup which can be useful for debugging.
 
 endif # CGROUPS
+
+config SCHED_AUTOGROUP
+	bool "Automatic process group scheduling"
+	select CGROUPS
+	select CGROUP_SCHED
+	select FAIR_GROUP_SCHED
+	help
+	  This option optimizes the scheduler for common desktop workloads by
+	  automatically creating and populating task groups.  This separation
+	  of workloads isolates aggressive CPU burners (like build jobs) from
+	  desktop applications.  Task group autogeneration is currently based
+	  upon task session.
 
 config MM_OWNER
 	bool

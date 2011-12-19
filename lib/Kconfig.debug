@@ -755,7 +755,7 @@ config FRAME_POINTER
 		(CRIS || M68K || M68KNOMMU || FRV || UML || \
 		 AVR32 || SUPERH || BLACKFIN || MN10300) || \
 		ARCH_WANT_FRAME_POINTERS
-	default n if (DEBUG_INFO && UML) || ARCH_WANT_FRAME_POINTERS
+	default y if (DEBUG_INFO && UML) || ARCH_WANT_FRAME_POINTERS
 	help
 	  If you say Y here the resulting kernel image will be slightly
 	  larger and slower, but it gives very useful debugging information

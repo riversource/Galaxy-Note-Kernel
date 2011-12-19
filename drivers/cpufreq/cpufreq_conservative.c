@@ -29,7 +29,7 @@
  * It helps to keep variable names smaller, simpler
  */
 
-#define DEF_FREQUENCY_UP_THRESHOLD		(60)
+#define DEF_FREQUENCY_UP_THRESHOLD		(55)
 #define DEF_FREQUENCY_DOWN_THRESHOLD		(30)
 
 /*
@@ -46,7 +46,7 @@
 
 static unsigned int min_sampling_rate;
 
-#define LATENCY_MULTIPLIER			(600)
+#define LATENCY_MULTIPLIER			(500)
 #define MIN_LATENCY_MULTIPLIER			(100)
 #define DEF_SAMPLING_DOWN_FACTOR		(1)
 #define MAX_SAMPLING_DOWN_FACTOR		(10)
@@ -94,7 +94,7 @@ static struct dbs_tuners {
 	.down_threshold = DEF_FREQUENCY_DOWN_THRESHOLD,
 	.sampling_down_factor = DEF_SAMPLING_DOWN_FACTOR,
 	.ignore_nice = 0,
-	.freq_step = 20,
+	.freq_step = 15,
 };
 
 static inline cputime64_t get_cpu_idle_time_jiffy(unsigned int cpu,
@@ -473,7 +473,7 @@ static void do_dbs_timer(struct work_struct *work)
 	/* We want all CPUs to do sampling nearly on same jiffy */
 	int delay = usecs_to_jiffies(dbs_tuners_ins.sampling_rate);
 
-	delay -= jiffies % delay;
+//	delay -= jiffies % delay;
 
 	mutex_lock(&dbs_info->timer_mutex);
 
@@ -487,7 +487,7 @@ static inline void dbs_timer_init(struct cpu_dbs_info_s *dbs_info)
 {
 	/* We want all CPUs to do sampling nearly on same jiffy */
 	int delay = usecs_to_jiffies(dbs_tuners_ins.sampling_rate);
-	delay -= jiffies % delay;
+//	delay -= jiffies % delay;
 
 	dbs_info->enable = 1;
 	INIT_DELAYED_WORK_DEFERRABLE(&dbs_info->work, do_dbs_timer);
@@ -630,7 +630,7 @@ static int __init cpufreq_gov_dbs_init(void)
 {
 	int err;
 
-	kconservative_wq = create_workqueue("kconservative");
+	kconservative_wq = 	alloc_workqueue("kconservative", WQ_HIGHPRI | WQ_CPU_INTENSIVE, 1);
 	if (!kconservative_wq) {
 		printk(KERN_ERR "Creation of kconservative failed\n");
 		return -EFAULT;

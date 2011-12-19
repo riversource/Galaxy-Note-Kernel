@@ -11,4 +11,4 @@
  *
  */
 
-void gpu_control_start(void);
+void gpu_clock_control_start(void);

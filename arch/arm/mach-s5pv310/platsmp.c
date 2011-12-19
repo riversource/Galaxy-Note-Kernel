@@ -212,6 +212,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	unsigned int cpu = smp_processor_id();
 	int i;
 
+	init_cpu_topology();
 	init_new_context(current, &init_mm);
 	smp_store_cpu_info(cpu);
 
