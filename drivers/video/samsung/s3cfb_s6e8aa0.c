@@ -50,7 +50,7 @@ int count_dsim;
 #define MIN_BRIGHTNESS		0
 #define MAX_BRIGHTNESS		255
 #define DEFAULT_GAMMA_LEVEL		12
-#define DEFAULT_BRIGHTNESS		120
+#define DEFAULT_BRIGHTNESS		100
 
 #define POWER_IS_ON(pwr)		((pwr) <= FB_BLANK_NORMAL)
 

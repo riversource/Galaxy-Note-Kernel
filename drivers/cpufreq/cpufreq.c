@@ -646,6 +646,69 @@ static ssize_t show_scaling_setspeed(struct cpufreq_policy *policy, char *buf)
 	return policy->governor->show_setspeed(policy, buf);
 }
 
+extern ssize_t acpuclk_get_vdd_levels_str(char *buf);
+static ssize_t show_vdd_levels(struct cpufreq_policy *policy, char *buf)
+{
+return acpuclk_get_vdd_levels_str(buf);
+}
+
+extern void acpuclk_set_vdd(unsigned acpu_khz, int vdd);
+static ssize_t store_vdd_levels(struct cpufreq_policy *policy, const char *buf, size_t count)
+{
+int i = 0, j;
+int pair[2] = { 0, 0 };
+int sign = 0;
+
+if (count < 1)
+return 0;
+
+if (buf[0] == '-')
+{
+sign = -1;
+i++;
+}
+else if (buf[0] == '+')
+{
+sign = 1;
+i++;
+}
+
+for (j = 0; i < count; i++)
+{
+char c = buf[i];
+if ((c >= '0') && (c <= '9'))
+{
+pair[j] *= 10;
+pair[j] += (c - '0');
+}
+else if ((c == ' ') || (c == '\t'))
+{
+if (pair[j] != 0)
+{
+j++;
+if ((sign != 0) || (j > 1))
+break;
+}
+}
+else
+break;
+}
+
+if (sign != 0)
+{
+if (pair[0] > 0)
+acpuclk_set_vdd(0, sign * pair[0]);
+}
+else
+{
+if ((pair[0] > 0) && (pair[1] > 0))
+acpuclk_set_vdd((unsigned)pair[0], pair[1]);
+else
+return -EINVAL;
+}
+
+return count;
+}
 /* sysfs interface for UV control */
 extern ssize_t show_UV_mV_table(struct cpufreq_policy *policy, char *buf);
 extern ssize_t store_UV_mV_table(struct cpufreq_policy *policy,
@@ -654,11 +717,29 @@ extern ssize_t store_UV_mV_table(struct cpufreq_policy *policy,
 extern ssize_t show_freq_table(struct cpufreq_policy *policy, char *buf);
 extern ssize_t store_freq_table(struct cpufreq_policy *policy,
                                       const char *buf, size_t count);
+/* sysfs interface for deepsleep entering cpu level */
+extern ssize_t show_deepsleep_cpulevel(struct cpufreq_policy *policy, char *buf);
+extern ssize_t store_deepsleep_cpulevel(struct cpufreq_policy *policy,
+                                      const char *buf, size_t count);
+/* sysfs interface for deepsleep entering bus level */
+extern ssize_t show_deepsleep_buslevel(struct cpufreq_policy *policy, char *buf);
+extern ssize_t store_deepsleep_buslevel(struct cpufreq_policy *policy,
+                                      const char *buf, size_t count);
 /* sysfs interface for bus frequency control */
 extern ssize_t show_busfreq_static(struct cpufreq_policy *policy, char *buf);
 extern ssize_t store_busfreq_static(struct cpufreq_policy *policy,
                                       const char *buf, size_t count);
 extern ssize_t show_cpu_class(struct cpufreq_policy *policy, char *buf);
+/* sysfs interface for cpu smooth scaling parameters */
+extern ssize_t show_smooth_offset(struct cpufreq_policy *policy, char *buf);
+extern ssize_t store_smooth_offset(struct cpufreq_policy *policy,
+                                      const char *buf, size_t count);
+extern ssize_t show_smooth_target(struct cpufreq_policy *policy, char *buf);
+extern ssize_t store_smooth_target(struct cpufreq_policy *policy,
+                                      const char *buf, size_t count);
+extern ssize_t show_smooth_step(struct cpufreq_policy *policy, char *buf);
+extern ssize_t store_smooth_step(struct cpufreq_policy *policy,
+                                      const char *buf, size_t count);
 
 /**
  * show_scaling_driver - show the current cpufreq HW/BIOS limitation
@@ -689,14 +770,21 @@ cpufreq_freq_attr_rw(scaling_min_freq);
 cpufreq_freq_attr_rw(scaling_max_freq);
 cpufreq_freq_attr_rw(scaling_governor);
 cpufreq_freq_attr_rw(scaling_setspeed);
-#ifndef CONFIG_SIYAH_SAFE_FEATURES
+cpufreq_freq_attr_rw(vdd_levels);
 /* UV table */
 cpufreq_freq_attr_rw(UV_mV_table);
 /* freq table */
 cpufreq_freq_attr_rw(freq_table);
-#endif
 /* busfreq_static_level */
 cpufreq_freq_attr_rw(busfreq_static);
+/* deepsleep cpu level */
+cpufreq_freq_attr_rw(deepsleep_cpulevel);
+/* deepsleep bus level */
+cpufreq_freq_attr_rw(deepsleep_buslevel);
+//smooth scaling params
+cpufreq_freq_attr_rw(smooth_offset);
+cpufreq_freq_attr_rw(smooth_target);
+cpufreq_freq_attr_rw(smooth_step);
 //cpu class
 cpufreq_freq_attr_ro(cpu_class);
 
@@ -712,11 +800,15 @@ static struct attribute *default_attrs[] = {
 	&scaling_driver.attr,
 	&scaling_available_governors.attr,
 	&scaling_setspeed.attr,
-#ifndef CONFIG_SIYAH_SAFE_FEATURES
+	&vdd_levels.attr,
 	&UV_mV_table.attr,
 	&freq_table.attr,
-#endif
 	&busfreq_static.attr,
+	&deepsleep_cpulevel.attr,
+	&deepsleep_buslevel.attr,
+	&smooth_offset.attr,
+	&smooth_target.attr,
+	&smooth_step.attr,
 	&cpu_class.attr,
 	NULL
 };
@@ -1707,6 +1799,14 @@ int cpufreq_register_governor(struct cpufreq_governor *governor)
 			governor->disableScalingDuringSuspend = 0;
 		else
 			governor->disableScalingDuringSuspend = 1;
+		if (!strncmp(governor->name, "powersave", CPUFREQ_NAME_LEN)
+		|| !strncmp(governor->name, "performance", CPUFREQ_NAME_LEN)
+		|| !strncmp(governor->name, "lulzactive", CPUFREQ_NAME_LEN)
+		|| !strncmp(governor->name, "interactive", 11)
+		)
+			governor->enableSmoothScaling = 0;
+		else
+			governor->enableSmoothScaling = 1;
 		list_add(&governor->governor_list, &cpufreq_governor_list);
 	}
 

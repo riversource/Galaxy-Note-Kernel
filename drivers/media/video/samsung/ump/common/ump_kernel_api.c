@@ -296,6 +296,12 @@ _mali_osk_errcode_t _ump_ukk_size_get( _ump_uk_size_get_s *user_interaction )
 void _ump_ukk_msync( _ump_uk_msync_s *args )
 {
 	ump_dd_mem * mem = NULL;
+
+	if (args->op == _UMP_UK_MSYNC_CLEAN_ALL_AND_INVALIDATE_ALL)
+	{
+		_ump_osk_msync( NULL ,  _UMP_UK_MSYNC_CLEAN_ALL_AND_INVALIDATE_ALL, 0, 0, 0);
+		return;
+	}
 	_mali_osk_lock_wait(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);
 	ump_descriptor_mapping_get(device.secure_id_map, (int)args->secure_id, (void**)&mem);
 	_mali_osk_lock_signal(device.secure_id_map_lock, _MALI_OSK_LOCKMODE_RW);

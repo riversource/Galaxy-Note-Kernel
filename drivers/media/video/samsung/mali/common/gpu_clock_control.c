@@ -4,7 +4,6 @@
  *  Copyright (C) 2011 Michael Wodkins
  *  twitter - @xdanetarchy
  *  XDA-developers - netarchy
- *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of the GNU General Public License as published by the
  *  Free Software Foundation;
@@ -16,40 +15,66 @@
 
 #include "gpu_clock_control.h"
 
-#ifndef CONFIG_ABYSSNOTE_FEATURES
 #define GPU_MAX_CLOCK 450
 #define GPU_MIN_CLOCK 10
-#else
-#define GPU_MAX_CLOCK 300
-#define GPU_MIN_CLOCK 100
-#endif
-#ifdef CONFIG_BATTERY
-int gpu_clock_control[2] = { 100, 267 };
-#else
-int gpu_clock_control[2] = { 160, 267 };
-#endif
+
+typedef struct mali_dvfs_tableTag{
+    unsigned int clock;
+    unsigned int freq;
+    unsigned int vol;
+}mali_dvfs_table;
+typedef struct mali_dvfs_thresholdTag{
+	unsigned int downthreshold;
+	unsigned int upthreshold;
+}mali_dvfs_threshold_table;
+extern mali_dvfs_table mali_dvfs[3];
+extern mali_dvfs_threshold_table mali_dvfs_threshold[3];
 
 static ssize_t gpu_clock_show(struct device *dev, struct device_attribute *attr, char *buf) {
-	return sprintf(buf, "Step0: %d\nStep1: %d\n", gpu_clock_control[0], gpu_clock_control[1]);
+	return sprintf(buf, "Step0: %d\nStep1: %d\nStep2: %d\n"
+						"Threshold0-1/up-down: %d%% %d%%\n"
+						"Threshold1-2/up-down: %d%% %d%%\n",
+		mali_dvfs[0].clock, mali_dvfs[1].clock, mali_dvfs[2].clock,
+		mali_dvfs_threshold[0].upthreshold*100/255, 
+		mali_dvfs_threshold[1].downthreshold*100/255,
+		mali_dvfs_threshold[1].upthreshold*100/255,
+		mali_dvfs_threshold[2].downthreshold*100/255
+		);
 }
+
+unsigned int g[4];
 
 static ssize_t gpu_clock_store(struct device *dev, struct device_attribute *attr, const char *buf,
 									size_t count) {
 	unsigned int ret = -EINVAL;
 	int i = 0;
-	ret = sscanf(buf, "%d %d", &gpu_clock_control[0], &gpu_clock_control[1]);
-	if (ret != 2) {
-		return -EINVAL;
-	}
+
+	if ( (ret=sscanf(buf, "%d%% %d%% %d%% %d%%", &g[0], &g[1], &g[2], &g[3])) == 4 ) i=1;
+	else if ( (ret=sscanf(buf, "%d%% %d%%", &g[0], &g[1])) == 2 ) i=1;
+	
+	if(i) {
+		if(g[1]<0 || g[0]>100 || g[0]<g[1]) return -EINVAL;
+		mali_dvfs_threshold[0].upthreshold = ((int)((255*g[0])/100));
+		mali_dvfs_threshold[1].downthreshold = ((int)((255*g[1])/100));
+		if(ret==4) {
+		if(g[3]<0 || g[2]>100 || g[2]<g[3]) return -EINVAL;
+		mali_dvfs_threshold[1].upthreshold = ((int)((255*g[2])/100));
+		mali_dvfs_threshold[2].downthreshold = ((int)((255*g[3])/100));
+		}		
+	} 
 	else {
+	  if ( (ret=sscanf(buf, "%d %d %d", &g[0], &g[1], &g[2]))!=3 )
+	    if( (ret=sscanf(buf, "%d %d", &g[0], &g[1]))!=2 )
+			return -EINVAL;
 		/* safety floor and ceiling - netarchy */
-		for( i = 0; i < 2; i++ ) {
-			if (gpu_clock_control[i] < GPU_MIN_CLOCK) {
-				gpu_clock_control[i] = GPU_MIN_CLOCK;
+		for( i = 0; i < 3; i++ ) {
+			if (g[i] < GPU_MIN_CLOCK) {
+				g[i] = GPU_MIN_CLOCK;
 			}
-			else if (gpu_clock_control[i] > GPU_MAX_CLOCK) {
-				gpu_clock_control[i] = GPU_MAX_CLOCK;
+			else if (g[i] > GPU_MAX_CLOCK) {
+				g[i] = GPU_MAX_CLOCK;
 			}
+			if(ret==3 || i<2) mali_dvfs[i].clock=g[i];
 		}
 	}
 	return count;	

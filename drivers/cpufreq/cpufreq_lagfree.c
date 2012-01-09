@@ -35,12 +35,12 @@
  * It helps to keep variable names smaller, simpler
  */
 
-#define DEF_FREQUENCY_UP_THRESHOLD				(55)
-#define DEF_FREQUENCY_DOWN_THRESHOLD				(25)
+#define DEF_FREQUENCY_UP_THRESHOLD				(60)
+#define DEF_FREQUENCY_DOWN_THRESHOLD				(30)
 #define FREQ_STEP_DOWN 						(200000)
 #define FREQ_SLEEP_MAX 						(500000)
-#define FREQ_AWAKE_MIN 						(500000)
-#define FREQ_STEP_UP_SLEEP_PERCENT				(20)
+#define FREQ_AWAKE_MIN 						(200000)
+#define FREQ_STEP_UP_SLEEP_PERCENT				(5)
 
 /*
  * The polling frequency of this governor depends on the capability of

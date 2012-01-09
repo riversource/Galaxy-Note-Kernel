@@ -19,6 +19,7 @@
 #include <asm/uaccess.h>    /* user space access */
 #include <linux/device.h>
 #include <linux/proc_fs.h>
+#include <linux/debugfs.h>
 
 /* the mali kernel subsystem types */
 #include "mali_kernel_subsystem.h"
@@ -64,6 +65,12 @@ MODULE_PARM_DESC(mali_hang_check_interval, "Interval at which to check for progr
 extern int mali_max_job_runtime;
 module_param(mali_max_job_runtime, int, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(mali_max_job_runtime, "Maximum allowed job runtime in msecs.\nJobs will be killed after this no matter what");
+
+#if defined(USING_MALI400_L2_CACHE)
+extern int mali_l2_max_reads;
+module_param(mali_l2_max_reads, int, S_IRUSR | S_IRGRP | S_IROTH);
+MODULE_PARM_DESC(mali_l2_max_reads, "Maximum reads for Mali L2 cache");
+#endif
 
 #if MALI_DVFS_ENABLED
 extern int mali_dvfs_control;
@@ -141,12 +148,19 @@ int mali_driver_init(void)
 #endif
 #endif
 #endif
-    err = mali_kernel_constructor();
-    if (_MALI_OSK_ERR_OK != err)
-    {
-        MALI_PRINT(("Failed to initialize driver (error %d)\n", err));
-        return -EFAULT;
-    }
+	err = mali_kernel_constructor();
+	if (_MALI_OSK_ERR_OK != err)
+	{
+#if USING_MALI_PMM
+#if MALI_LICENSE_IS_GPL
+#ifdef CONFIG_PM
+		_mali_dev_platform_unregister();
+#endif
+#endif
+#endif
+		MALI_PRINT(("Failed to initialize driver (error %d)\n", err));
+		return -EFAULT;
+	}
 
     return 0;
 }
@@ -185,11 +199,30 @@ void mali_driver_exit(void)
 #endif
 }
 
+static ssize_t memory_used_read(struct file *filp, char __user *ubuf, size_t cnt, loff_t *ppos)
+{
+	char buf[64];
+	size_t r;
+	u32 mem = _mali_ukk_report_memory_usage();
+
+	r = snprintf(buf, 64, "%u\n", mem);
+	return simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
+}
+
+static const struct file_operations memory_usage_fops = {
+	.owner = THIS_MODULE,
+	.read = memory_used_read,
+};
+
+struct dentry *mali_debugfs_dir = NULL;
+
 /* called from _mali_osk_init */
 int initialize_kernel_device(void)
 {
 	int err;
 	dev_t dev = 0;
+	mali_debugfs_dir = debugfs_create_dir("mali", NULL);
+	debugfs_create_file("memory_usage", 0400, mali_debugfs_dir, NULL, &memory_usage_fops);
 
 	if (0 == mali_major)
 	{
@@ -387,7 +420,6 @@ static int mali_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, 
 		return -ENOTTY;
 	}
 
-
     switch(cmd)
     {
         case MALI_IOC_GET_SYSTEM_INFO_SIZE:
@@ -478,7 +510,7 @@ static int mali_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, 
 
 		case MALI_IOC_MEM_ATTACH_UMP:
 		case MALI_IOC_MEM_RELEASE_UMP: /* FALL-THROUGH */
-        	MALI_DEBUG_PRINT(2, ("UMP not supported\n", cmd, arg));
+        	MALI_DEBUG_PRINT(2, ("UMP not supported\n"));
             err = -ENOTTY;
 			break;
 #endif
@@ -519,6 +551,10 @@ static int mali_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, 
             err = gp_suspend_response_wrapper(session_data, (_mali_uk_gp_suspend_response_s __user *)arg);
             break;
 
+		case MALI_IOC_VSYNC_EVENT_REPORT:
+		    err = vsync_event_report_wrapper(session_data, (_mali_uk_vsync_event_report_s __user *)arg);
+		    break;
+
         default:
         	MALI_DEBUG_PRINT(2, ("No handler for ioctl 0x%08X 0x%08lX\n", cmd, arg));
             err = -ENOTTY;
@@ -530,7 +566,22 @@ static int mali_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, 
 #if MALI_STATE_TRACKING
 static int mali_proc_read(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
+	int len = 0;
+
 	MALI_DEBUG_PRINT(1, ("mali_proc_read(page=%p, start=%p, off=%u, count=%d, eof=%p, data=%p\n", page, start, off, count, eof, data));
+
+	if (off > 0)
+	{
+		return 0;
+	}
+
+	if (count < 1024)
+	{
+		return 0;
+	}
+
+	len  = sprintf(page + len, "Mali device driver %s\n", SVN_REV_STRING);
+	len += sprintf(page + len, "License: %s\n", MALI_KERNEL_LINUX_LICENSE);
 
 	/*
 	 * A more elegant solution would be to gather information from all subsystems and
@@ -539,7 +590,7 @@ static int mali_proc_read(char *page, char **start, off_t off, int count, int *e
 	 */
 	_mali_kernel_core_dump_state();
 
-	return 0;	
+	return len;	
 }
 #endif
 

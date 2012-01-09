@@ -1036,9 +1036,9 @@ static int subsystem_maligp_irq_handler_bottom_half(mali_core_renderunit* core)
 		MALI_DEBUG_PRINT(1, ("Mali GP: Registers Before reset:\n"));
 		maligp_print_regs(1, core);
 		#endif
-		#if MALI_STATE_TRACKING
+#if MALI_STATE_TRACKING
 		_mali_osk_atomic_inc(&job->session->jobs_ended);
-		#endif
+#endif
 		return JOB_STATUS_END_UNKNOWN_ERR;
 	}
 }
@@ -1049,7 +1049,7 @@ to a created mali_core_job object with the data given from userspace */
 static _mali_osk_errcode_t subsystem_maligp_get_new_job_from_user(struct mali_core_session * session, void * argument)
 {
 	maligp_job *jobgp;
-	mali_core_job *job=NULL;
+	mali_core_job *job = NULL;
 	mali_core_job *previous_replaced_job;
 	_mali_osk_errcode_t err = _MALI_OSK_ERR_OK;
 	_mali_uk_gp_start_job_s * user_ptr_job_input;
@@ -1173,9 +1173,12 @@ function_exit:
 	}
 #if MALI_STATE_TRACKING
 	if (_MALI_UK_START_JOB_STARTED==user_ptr_job_input->status)
-        {
-                if(job)job->job_nr=_mali_osk_atomic_inc_return(&session->jobs_received);
-        }
+	{
+		if(job)
+		{
+			job->job_nr=_mali_osk_atomic_inc_return(&session->jobs_received);
+		}
+	}
 #endif
 
 	MALI_ERROR(err);

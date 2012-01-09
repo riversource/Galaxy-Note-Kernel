@@ -19,6 +19,9 @@ extern "C"
 _mali_osk_errcode_t initialize_kernel_device(void);
 void terminate_kernel_device(void);
 
+void mali_osk_low_level_mem_init(void);
+void mali_osk_low_level_mem_term(void);
+
 #ifdef __cplusplus
 }
 #endif

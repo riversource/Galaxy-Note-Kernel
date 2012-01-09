@@ -37,6 +37,7 @@
 #include <plat/s5pv310.h>
 #include <mach/sec_debug.h>
 #include "s3cfb.h"
+#include "logo_rgb24.h"
 
 struct s3c_platform_fb *to_fb_plat(struct device *dev)
 {
@@ -107,7 +108,7 @@ int s3cfb_draw_logo(struct fb_info *fb)
 	}
 
 	logo_virt_buf = ioremap_nocache(bootloaderfb, fb->var.yres * fb->fix.line_length);
-	memcpy(fb->screen_base, logo_virt_buf, fb->var.yres * fb->fix.line_length);
+	memcpy(fb->screen_base, LOGO_RGB24, fb->var.yres * fb->fix.line_length);
 	iounmap(logo_virt_buf);
 
 #endif /* #ifdef RGB_BOOTSCREEN */

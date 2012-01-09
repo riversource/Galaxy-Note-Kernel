@@ -779,6 +779,10 @@ static volatile unsigned int printk_cpu = UINT_MAX;
  */
 static inline int can_use_console(unsigned int cpu)
 {
+#ifdef CONFIG_HOTPLUG_CPU
+	if (!cpu_active(cpu) && cpu_hotplug_inprogress())
+		return 0;
+#endif
 	return cpu_online(cpu) || have_callable_console();
 }
 
@@ -1193,7 +1197,7 @@ int printk_needs_cpu(int cpu)
 void wake_up_klogd(void)
 {
 	if (waitqueue_active(&log_wait))
-		this_cpu_write(printk_pending, 1);
+		__raw_get_cpu_var(printk_pending) = 1;
 }
 
 /**

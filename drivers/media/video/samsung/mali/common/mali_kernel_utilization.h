@@ -31,6 +31,11 @@ void mali_utilization_term(void);
 void mali_utilization_core_start(void);
 
 /**
+ * Should be called to stop the utilization timer during system suspend
+ */
+void mali_utilization_suspend(void);
+
+/**
  * Should be called when a job has completed executing a job
  */
 void mali_utilization_core_end(void);

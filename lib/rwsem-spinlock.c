@@ -9,8 +9,6 @@
 #include <linux/sched.h>
 #include <linux/module.h>
 
-#include <mach/sec_debug.h>
-
 struct rwsem_waiter {
 	struct list_head list;
 	struct task_struct *task;
@@ -149,7 +147,6 @@ void __sched __down_read(struct rw_semaphore *sem)
 
 	spin_lock_irqsave(&sem->wait_lock, flags);
 
-	debug_rwsemaphore_down_read_log(sem);
 	if (sem->activity >= 0 && list_empty(&sem->wait_list)) {
 		/* granted */
 		sem->activity++;
@@ -198,7 +195,6 @@ int __down_read_trylock(struct rw_semaphore *sem)
 		/* granted */
 		sem->activity++;
 		ret = 1;
-		debug_rwsemaphore_down_read_log(sem);
 	}
 
 	spin_unlock_irqrestore(&sem->wait_lock, flags);
@@ -218,7 +214,6 @@ void __sched __down_write_nested(struct rw_semaphore *sem, int subclass)
 
 	spin_lock_irqsave(&sem->wait_lock, flags);
 
-	debug_rwsemaphore_down_write_log(sem);
 	if (sem->activity == 0 && list_empty(&sem->wait_list)) {
 		/* granted */
 		sem->activity = -1;
@@ -271,7 +266,6 @@ int __down_write_trylock(struct rw_semaphore *sem)
 		/* granted */
 		sem->activity = -1;
 		ret = 1;
-		debug_rwsemaphore_down_write_log(sem);
 	}
 
 	spin_unlock_irqrestore(&sem->wait_lock, flags);
@@ -291,7 +285,6 @@ void __up_read(struct rw_semaphore *sem)
 	if (--sem->activity == 0 && !list_empty(&sem->wait_list))
 		sem = __rwsem_wake_one_writer(sem);
 
-	debug_rwsemaphore_up_log(sem);
 	spin_unlock_irqrestore(&sem->wait_lock, flags);
 }
 
@@ -308,7 +301,6 @@ void __up_write(struct rw_semaphore *sem)
 	if (!list_empty(&sem->wait_list))
 		sem = __rwsem_do_wake(sem, 1);
 
-	debug_rwsemaphore_up_log(sem);
 	spin_unlock_irqrestore(&sem->wait_lock, flags);
 }
 
@@ -326,8 +318,6 @@ void __downgrade_write(struct rw_semaphore *sem)
 	if (!list_empty(&sem->wait_list))
 		sem = __rwsem_do_wake(sem, 0);
 
-	debug_rwsemaphore_up_log(sem);
-	debug_rwsemaphore_down_read_log(sem);
 	spin_unlock_irqrestore(&sem->wait_lock, flags);
 }
 

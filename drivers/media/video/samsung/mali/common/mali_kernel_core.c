@@ -52,6 +52,7 @@ static _mali_osk_errcode_t mali_kernel_subsystem_core_system_info_fill(_mali_sys
 static _mali_osk_errcode_t mali_kernel_subsystem_core_session_begin(struct mali_session_data * mali_session_data, mali_kernel_subsystem_session_slot * slot, _mali_osk_notification_queue_t * queue);
 
 static _mali_osk_errcode_t build_system_info(void);
+static void cleanup_system_info(_mali_system_info *cleanup);
 
 /**
  * @brief handler for MEM_VALIDATION resources
@@ -304,6 +305,9 @@ static void terminate_subsystems(void)
 		if (NULL != subsystems[i]->shutdown) subsystems[i]->shutdown(i);
 	}
     if (system_info_lock) _mali_osk_lock_term( system_info_lock );
+
+	/* Free _mali_system_info struct */
+	cleanup_system_info(system_info);
 }
 
 void _mali_kernel_core_broadcast_subsystem_message(mali_core_notification_message message, u32 data)
@@ -341,6 +345,30 @@ static void mali_kernel_subsystem_core_cleanup(mali_kernel_subsystem_identifier 
     _mali_osk_resources_term(&arch_configuration, num_resources);
 }
 
+static void cleanup_system_info(_mali_system_info *cleanup)
+{
+	_mali_core_info * current_core;
+	_mali_mem_info * current_mem;
+
+	/* delete all the core info structs */
+	while (NULL != cleanup->core_info)
+	{
+		current_core = cleanup->core_info;
+		cleanup->core_info = cleanup->core_info->next;
+		_mali_osk_free(current_core);
+	}
+
+	/* delete all the mem info struct */
+	while (NULL != cleanup->mem_info)
+	{
+		current_mem = cleanup->mem_info;
+		cleanup->mem_info = cleanup->mem_info->next;
+		_mali_osk_free(current_mem);
+	}
+
+	/* delete the system info struct itself */
+	_mali_osk_free(cleanup);
+}
 
 static _mali_osk_errcode_t build_system_info(void)
 {
@@ -406,25 +434,7 @@ error_exit:
 	if (NULL == cleanup) MALI_ERROR((_mali_osk_errcode_t)err); /* no cleanup needed, return what err contains */
 
 	/* cleanup */
-
-	/* delete all the core info structs */
-	while (NULL != cleanup->core_info)
-	{
-		current_core = cleanup->core_info;
-		cleanup->core_info = cleanup->core_info->next;
-		_mali_osk_free(current_core);
-	}
-
-	/* delete all the mem info struct */
-	while (NULL != cleanup->mem_info)
-	{
-		current_mem = cleanup->mem_info;
-		cleanup->mem_info = cleanup->mem_info->next;
-		_mali_osk_free(current_mem);
-	}
-
-	/* delete the system info struct itself */
-	_mali_osk_free(cleanup);
+	cleanup_system_info(cleanup);
 
 	/* return whatever err is, we could end up here in both the error and success cases */
 	MALI_ERROR((_mali_osk_errcode_t)err);
@@ -871,7 +881,6 @@ _mali_osk_errcode_t mali_core_signal_power_down( mali_pmm_core_id core, mali_boo
 }
 
 #endif
-
 
 
 #if MALI_STATE_TRACKING

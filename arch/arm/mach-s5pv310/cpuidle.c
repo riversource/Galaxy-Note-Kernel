@@ -37,7 +37,7 @@
 
 /* enable AFTR/LPA feature */
 static enum { ENABLE_IDLE = 0, ENABLE_AFTR = 1, ENABLE_LPA = 2 } enable_mask =
-    ENABLE_IDLE | ENABLE_LPA;
+    ENABLE_IDLE | ENABLE_AFTR | ENABLE_LPA;
 module_param_named(enable_mask, enable_mask, uint, 0644);
 
 static unsigned long *regs_save;

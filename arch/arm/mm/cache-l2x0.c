@@ -40,10 +40,10 @@ static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
 #ifdef CONFIG_CACHE_PL310
 static inline void cache_wait(void __iomem *reg, unsigned long mask)
 {
-	/* cache operations by line are atomic on PL310 */
+	/* cache operation by line are atomic on PL310 */
 }
 #else
-#define cache_wait     cache_wait_way
+#define cache_wait	cache_wait_way
 #endif
 
 static inline void cache_sync(void)
@@ -299,7 +299,7 @@ static void l2x0_disable(void)
 	unsigned long flags;
 
 	spin_lock_irqsave(&l2x0_lock, flags);
-	writel(0, l2x0_base + L2X0_CTRL);
+	writel_relaxed(0, l2x0_base + L2X0_CTRL);
 	spin_unlock_irqrestore(&l2x0_lock, flags);
 }
 
@@ -370,6 +370,7 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
 	outer_cache.sync = l2x0_cache_sync;
 	outer_cache.flush_all = l2x0_flush_all;
 	outer_cache.inv_all = l2x0_inv_all;
+	outer_cache.clean_all = l2x0_clean_all;
 	outer_cache.disable = l2x0_disable;
 	outer_cache.nolock_flush_all = l2x0_nolock_flush_all;
 	outer_cache.nolock_clean_all = l2x0_nolock_clean_all;

@@ -211,7 +211,7 @@ static int block_allocator_allocate(void* ctx, ump_dd_mem * mem)
 		mem->backend_info = NULL;
 		mem->block_array = NULL;
 
-		DBG_MSG(4, ("Could not find a mem-block for the allocation.\n"));
+		MSG_ERR(("Could not find a mem-block for the allocation.\n"));
 		up(&allocator->mutex);
 
 		return 0;

@@ -784,6 +784,7 @@ static int subsystem_mali200_irq_handler_bottom_half(struct mali_core_renderunit
 #if MALI_STATE_TRACKING
 		_mali_osk_atomic_inc(&job->session->jobs_ended);
 #endif
+
 		return JOB_STATUS_END_HANG;
    	}
 	/* HW watchdog triggered or an existing hang check passed? */
@@ -826,6 +827,7 @@ static int subsystem_mali200_irq_handler_bottom_half(struct mali_core_renderunit
 			MALI_DEBUG_PRINT_IF(1, (0 == (bus_error & 0x03)), ("Bus error but neither read or write was set as the error reason\n"));
 			(void)bus_error;
 		}
+
 #if MALI_STATE_TRACKING
 		_mali_osk_atomic_inc(&job->session->jobs_ended);
 #endif
@@ -839,7 +841,7 @@ to a created mali_core_job object with the data given from userspace */
 static _mali_osk_errcode_t subsystem_mali200_get_new_job_from_user(struct mali_core_session * session, void * argument)
 {
 	mali200_job *job200;
-	mali_core_job *job=NULL;
+	mali_core_job *job = NULL;
 	mali_core_job *previous_replaced_job;
 	_mali_osk_errcode_t err = _MALI_OSK_ERR_OK;
 	_mali_uk_pp_start_job_s * user_ptr_job_input;
@@ -971,9 +973,12 @@ function_exit:
 	}
 #if MALI_STATE_TRACKING
 	if (_MALI_UK_START_JOB_STARTED==user_ptr_job_input->status)
-        {
-                if(job)job->job_nr=_mali_osk_atomic_inc_return(&session->jobs_received);
-        }
+	{
+		if(job)
+		{
+			job->job_nr=_mali_osk_atomic_inc_return(&session->jobs_received);
+		}
+	}
 #endif
 
 	MALI_ERROR(err);

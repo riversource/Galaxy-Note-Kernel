@@ -1398,8 +1398,6 @@ static void rcu_process_callbacks(struct softirq_action *unused)
 	 */
 	smp_mb(); /* See above block comment. */
 
-	/* If we are last CPU on way to dyntick-idle mode, accelerate it. */
-	rcu_needs_cpu_flush();
 }
 
 static void

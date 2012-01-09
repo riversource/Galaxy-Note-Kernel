@@ -147,7 +147,7 @@ static int ump_vcm_allocate(void *ctx, ump_dd_mem * descriptor)
 	descriptor->backend_info = (void*)ump_vcm;
 	
 	if (down_interruptible(&info->mutex)) {
-		DBG_MSG(1, ("Failed to get mutex in ump_vcm_allocate\n"));
+		MSG_ERR(("Failed to get mutex in ump_vcm_allocate\n"));
 		return 0;	/* failure */
 	}
 
@@ -188,7 +188,7 @@ static int vcm_mem_allocator(vcm_allocator *info, ump_dd_mem *descriptor)
 
 	if (NULL == descriptor->block_array) {
 		vfree(descriptor->block_array);
-		DBG_MSG(1, ("Could not allocate a mem handle for function.\n"));
+		MSG_ERR(("Could not allocate a mem handle for function.\n"));
 		return 0; /* failure */
 	}
 
@@ -232,7 +232,7 @@ static void ump_vcm_free(void *ctx, ump_dd_mem * descriptor)
 	BUG_ON(descriptor->nr_blocks > info->num_vcm_blocks);
 
 	if (down_interruptible(&info->mutex)) {
-		DBG_MSG(1, ("Failed to get mutex in ump_vcm_free\n"));
+		MSG_ERR(("Failed to get mutex in ump_vcm_free\n"));
 		return;
 	}
 

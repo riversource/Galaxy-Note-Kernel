@@ -183,6 +183,7 @@ struct cpufreq_governor {
 	struct list_head	governor_list;
 	struct module		*owner;
 	int disableScalingDuringSuspend;
+	int enableSmoothScaling;
 };
 
 /* pass a target to the cpufreq driver 

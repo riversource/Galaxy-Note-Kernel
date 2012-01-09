@@ -426,6 +426,7 @@ int mali_device_resume(unsigned int event_id, struct task_struct **pwr_mgmt_thre
 
 /** This function is called when mali GPU device is to be resumed
  */
+extern int mali_gpu_clk;
 
 static int mali_pm_resume(struct device *dev)
 {
@@ -434,6 +435,11 @@ static int mali_pm_resume(struct device *dev)
 
 #ifdef CONFIG_REGULATOR
 	mali_regulator_enable();
+#ifdef CONFIG_VIDEO_MALI400MP_DVFS
+	mali_default_step_set(0,0);
+#else
+	mali_clk_set_rate(mali_gpu_clk, 1000000);
+#endif
 #endif
 
 	if (mali_device_state == _MALI_DEVICE_RESUME)
@@ -441,6 +447,7 @@ static int mali_pm_resume(struct device *dev)
 		_mali_osk_lock_signal(lock, _MALI_OSK_LOCKMODE_RW);
 		return err;
 	}
+	
 	err = mali_device_resume(MALI_PMM_EVENT_OS_POWER_UP, &pm_thread);
 	mali_device_state = _MALI_DEVICE_RESUME;
 	mali_dvfs_device_state = _MALI_DEVICE_RESUME;
@@ -502,8 +509,6 @@ static int mali_device_runtime_resume(struct device *dev)
 
 /* This function is called from android framework.
  */
- 
-
 static void mali_pm_early_suspend(struct early_suspend *mali_dev)
 {
 	switch(mali_dev->level)
@@ -758,7 +763,7 @@ int _mali_dev_platform_register(void)
 	gpu_clock_control_start();
 	gpu_voltage_control_start();
 #endif
-
+	
 #ifdef CONFIG_PM_RUNTIME
 #ifndef CONFIG_HAS_EARLYSUSPEND
 #if MALI_PMM_RUNTIME_JOB_CONTROL_ON

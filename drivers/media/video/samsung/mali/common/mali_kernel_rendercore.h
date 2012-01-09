@@ -233,6 +233,14 @@ void subsystem_flush_mapped_mem_cache(void);
 		if ( SUBSYSTEM_MAGIC_NR != subsystem->magic_nr) MALI_PRINT_ERROR(("Wrong magic number"));\
 	} while (0)
 
+#define MALI_CHECK_SUBSYSTEM_RETURN(subsystem)\
+	do { \
+		if (SUBSYSTEM_MAGIC_NR != subsystem->magic_nr) {\
+			MALI_PRINT_ERROR(("Wrong magic number"));\
+			return _MALI_OSK_ERR_INVALID_ARGS;\
+		} \
+	} while (0)
+
 #define MALI_CHECK_CORE(CORE)\
 	do { \
 		if ( CORE_MAGIC_NR != CORE->magic_nr) MALI_PRINT_ERROR(("Wrong magic number"));\
@@ -242,6 +250,14 @@ void subsystem_flush_mapped_mem_cache(void);
 	do { \
 		if ( SESSION_MAGIC_NR != SESSION->magic_nr) MALI_PRINT_ERROR(("Wrong magic number"));\
 } while (0)
+
+#define MALI_CHECK_SESSION_RETURN(SESSION)\
+	do { \
+		if (SESSION_MAGIC_NR != SESSION->magic_nr) {\
+			MALI_PRINT_ERROR(("Wrong magic number"));\
+			return _MALI_OSK_ERR_INVALID_ARGS;\
+		} \
+	} while (0)
 
 #define MALI_CHECK_JOB(JOB)\
 	do { \
@@ -295,12 +311,14 @@ typedef struct register_array_user
 		MALI_DEBUG_PRINT(5, ("MUTEX: GRABBED %s() %d on %s\n",__FUNCTION__, __LINE__, subsys->name)); \
 		if ( SUBSYSTEM_MAGIC_NR != subsys->magic_nr ) MALI_PRINT_ERROR(("Wrong magic number"));\
 		rendercores_global_mutex_is_held = 1; \
+		rendercores_global_mutex_owner = _mali_osk_get_tid();  \
 	} while (0) ;
 
 #define MALI_CORE_SUBSYSTEM_MUTEX_RELEASE(subsys) \
 	do { \
 		MALI_DEBUG_PRINT(5, ("MUTEX: RELEASE %s() %d on %s\n",__FUNCTION__, __LINE__, subsys->name)); \
 		rendercores_global_mutex_is_held = 0; \
+		 rendercores_global_mutex_owner = 0; \
 		if ( SUBSYSTEM_MAGIC_NR != subsys->magic_nr ) MALI_PRINT_ERROR(("Wrong magic number"));\
 		_mali_osk_lock_signal( rendercores_global_mutex, _MALI_OSK_LOCKMODE_RW); \
 		MALI_DEBUG_PRINT(5, ("MUTEX: RELEASED %s() %d on %s\n",__FUNCTION__, __LINE__, subsys->name)); \
@@ -312,6 +330,7 @@ typedef struct register_array_user
 	do { \
 		if ( 0 == rendercores_global_mutex_is_held ) MALI_PRINT_ERROR(("ASSERT MUTEX SHOULD BE GRABBED"));\
 		if ( SUBSYSTEM_MAGIC_NR != input_pointer->magic_nr ) MALI_PRINT_ERROR(("Wrong magic number"));\
+		if ( rendercores_global_mutex_owner != _mali_osk_get_tid() ) MALI_PRINT_ERROR(("Owner mismatch"));\
 	} while (0)
 
 

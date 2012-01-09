@@ -232,7 +232,7 @@ static struct usb_configuration android_config_driver = {
 	.bmAttributes	= USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
 #ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 /* soonyong.cho : This value of max power is referred from S1 */
-	.bMaxPower	= 0x30, /* 96ma */
+	.bMaxPower	= 0xFA, /* 96ma */
 #else /* original */
 	.bMaxPower	= 0xFA, /* 500ma */
 #endif /* CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE */

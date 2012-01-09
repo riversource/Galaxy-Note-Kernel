@@ -262,7 +262,7 @@ _mali_osk_errcode_t _ump_ukk_map_mem( _ump_uk_map_mem_s *args )
 	{
 		_mali_osk_free(descriptor);
 		ump_dd_reference_release(handle);
-		DBG_MSG(1, ("ump_ukk_map_mem: unable to allocate a descriptor_mapping for return cookie\n"));
+		MSG_ERR(("ump_ukk_map_mem: unable to allocate a descriptor_mapping for return cookie\n"));
 
 		return _MALI_OSK_ERR_NOMEM;
 	}
@@ -389,5 +389,8 @@ void _ump_ukk_unmap_mem( _ump_uk_unmap_mem_s *args )
 	ump_dd_reference_release(handle);
 
 	_ump_osk_mem_mapregion_term( descriptor );
-	_mali_osk_free(descriptor);
+	if (descriptor)
+		_mali_osk_free(descriptor);
+	else
+		MSG_ERR(("descriptor pointer is NULL\n"));
 }

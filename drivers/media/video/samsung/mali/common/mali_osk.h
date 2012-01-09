@@ -578,13 +578,13 @@ typedef struct _mali_osk_resource
 /** @brief Fake IRQ number for testing purposes
  */
 #define _MALI_OSK_IRQ_NUMBER_FAKE ((u32)0xFFFFFFF1)
+
 /** @addtogroup _mali_osk_irq
  * @{ */
 
 /** @brief PMM Virtual IRQ number
  */
 #define _MALI_OSK_IRQ_NUMBER_PMM ((u32)0xFFFFFFF2)
-
 
 
 /** @brief Initialize IRQ handling for a resource
@@ -700,6 +700,16 @@ void _mali_osk_irq_schedulework( _mali_osk_irq_t *irq );
  * resource whose IRQ handling is to be terminated.
  */
 void _mali_osk_irq_term( _mali_osk_irq_t *irq );
+
+/** @brief flushing workqueue.
+ *
+ * This will flush the workqueue.
+ *
+ * @param irq a pointer to the _mali_osk_irq_t object corresponding to the
+ * resource whose IRQ handling is to be terminated.
+ */
+void _mali_osk_flush_workqueue( _mali_osk_irq_t *irq );
+
 /** @} */ /* end group _mali_osk_irq */
 
 
@@ -871,7 +881,7 @@ void *_mali_osk_memset( void *s, u32 c, u32 n );
 
 /** @brief Checks the amount of memory allocated
  *
- * Checks that not more than \a max_allocated bytes are allocated. 
+ * Checks that not more than \a max_allocated bytes are allocated.
  *
  * Some OS bring up an interactive out of memory dialogue when the
  * system runs out of memory. This can stall non-interactive
@@ -879,7 +889,7 @@ void *_mali_osk_memset( void *s, u32 c, u32 n );
  * not trigger the OOM dialogue by keeping allocations
  * within a certain limit.
  *
- * @return MALI_TRUE when \a max_allocated bytes are not in use yet. MALI_FALSE 
+ * @return MALI_TRUE when \a max_allocated bytes are not in use yet. MALI_FALSE
  * when at least \a max_allocated bytes are in use.
  */
 mali_bool _mali_osk_mem_check_allocated( u32 max_allocated );
@@ -1147,7 +1157,7 @@ void _mali_osk_cache_flushall( void );
  *
  * Some OS do not perform a full cache flush (including all outer caches) for uncached mapped memory.
  * They zero the memory through a cached mapping, then flush the inner caches but not the outer caches.
- * This is required for MALI to have the correct view of the memory. 
+ * This is required for MALI to have the correct view of the memory.
  */
 void _mali_osk_cache_ensure_uncached_range_flushed( void *uncached_mapping, u32 offset, u32 size );
 
@@ -1522,7 +1532,7 @@ u32	_mali_osk_time_tickcount( void );
 void _mali_osk_time_ubusydelay( u32 usecs );
 
 /** @brief Return time in nano seconds, since any given reference.
- * 
+ *
  * @return Time in nano seconds
  */
 u64 _mali_osk_time_get_ns( void );
@@ -1558,6 +1568,18 @@ u32 _mali_osk_clz( u32 val );
  * @param ... a variable-number of parameters suitable for \a fmt
  */
 void _mali_osk_dbgmsg( const char *fmt, ... );
+
+/** @brief Print fmt into buf.
+ *
+ * The interpretation of \a fmt is the same as the \c format parameter in
+ * _mali_osu_vsnprintf().
+ *
+ * @param buf a pointer to the result buffer
+ * @param size the total number of bytes allowed to write to \a buf
+ * @param fmt a _mali_osu_vsnprintf() style format string
+ * @param ... a variable-number of parameters suitable for \a fmt
+ */
+u32 _mali_osk_snprintf( char *buf, u32 size, const char *fmt, ... );
 
 /** @brief Abnormal process abort.
  *

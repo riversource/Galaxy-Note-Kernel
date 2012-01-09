@@ -107,6 +107,7 @@ struct mali_kernel_subsystem mali_subsystem_rendercore=
 
 static _mali_osk_lock_t *rendercores_global_mutex = NULL;
 static u32 rendercores_global_mutex_is_held = 0;
+static u32 rendercores_global_mutex_owner = 0;
 
 /** The 'dummy' rendercore subsystem to allow global subsystem mutex to be
  * locked for all subsystems that extend the ''rendercore'' */
@@ -549,6 +550,7 @@ static void mali_core_renderunit_irq_handler_remove(mali_core_renderunit *core)
 mali_core_renderunit * mali_core_renderunit_get_mali_core_nr(mali_core_subsystem *subsys, u32 mali_core_nr)
 {
 	mali_core_renderunit * core;
+	MALI_ASSERT_MUTEX_IS_GRABBED(subsys);
 	if (subsys->number_of_cores <= mali_core_nr)
 	{
 		MALI_PRINT_ERROR(("Trying to get illegal mali_core_nr: 0x%x for %s", mali_core_nr, subsys->name));
@@ -608,6 +610,8 @@ void mali_core_subsystem_attach_mmu(mali_core_subsystem* subsys)
 	u32 i;
 	mali_core_renderunit * core;
 
+	MALI_CORE_SUBSYSTEM_MUTEX_GRAB(subsys);
+
 	for(i=0 ; i < subsys->number_of_cores ; ++i)
 	{
 		core = mali_core_renderunit_get_mali_core_nr(subsys,i);
@@ -615,6 +619,8 @@ void mali_core_subsystem_attach_mmu(mali_core_subsystem* subsys)
 		core->mmu = mali_memory_core_mmu_lookup(core->mmu_id);
 		MALI_DEBUG_PRINT(2, ("Attach mmu: 0x%x to core: %s in subsystem: %s\n", core->mmu, core->description, subsys->name));
 	}
+
+	MALI_CORE_SUBSYSTEM_MUTEX_RELEASE(subsys);
 }
 #endif
 
@@ -867,11 +873,11 @@ _mali_osk_errcode_t mali_core_subsystem_ioctl_number_of_cores_get(mali_core_sess
 	if ( NULL != number_of_cores )
 	{
 		*number_of_cores = subsystem->number_of_cores;
+
+		MALI_DEBUG_PRINT(4, ("Core: ioctl_number_of_cores_get: %s: %u\n", subsystem->name, *number_of_cores) ) ;
 	}
 
-	MALI_DEBUG_PRINT(4, ("Core: ioctl_number_of_cores_get: %s: %u\n", subsystem->name, *number_of_cores) ) ;
-
-    MALI_SUCCESS;
+	MALI_SUCCESS;
 }
 
 _mali_osk_errcode_t mali_core_subsystem_ioctl_start_job(mali_core_session * session, void *job_data)
@@ -1063,15 +1069,7 @@ static void mali_core_subsystem_move_core_set_idle(mali_core_renderunit *core)
 
 	oldstatus = core->state;
 	
-	if( core->pend_power_down )
-	{
-		core->state = CORE_OFF ;
-		_mali_osk_list_move( &core->list, &subsystem->renderunit_off_head );
-		/* Done the move from the active queues, so the pending power down can be done */
-		core->pend_power_down = MALI_FALSE;
-		malipmm_core_power_down_okay( core->pmm_id );
-	}
-	else
+	if ( !core->pend_power_down )	
 	{
 		core->state = CORE_IDLE ;
 		_mali_osk_list_move( &core->list, &subsystem->renderunit_idle_head );
@@ -1094,6 +1092,15 @@ static void mali_core_subsystem_move_core_set_idle(mali_core_renderunit *core)
 #endif /* USING_MMU */
 	}
 
+	if( core->pend_power_down )
+	{
+		core->state = CORE_OFF ;
+		_mali_osk_list_move( &core->list, &subsystem->renderunit_off_head );
+		
+		/* Done the move from the active queues, so the pending power down can be done */
+		core->pend_power_down = MALI_FALSE;
+		malipmm_core_power_down_okay( core->pmm_id );
+	}
 
 #else /* !USING_MALI_PMM */
 
@@ -1396,9 +1403,9 @@ void mali_core_session_begin(mali_core_session * session)
 	_mali_osk_list_add(&session->all_sessions_list, &session->subsystem->all_sessions_head);
 
 #if MALI_STATE_TRACKING
-	 _mali_osk_atomic_init(&session->jobs_received, 0);
-        _mali_osk_atomic_init(&session->jobs_returned, 0);
-        session->pid = _mali_osk_get_pid();
+	_mali_osk_atomic_init(&session->jobs_received, 0);
+	_mali_osk_atomic_init(&session->jobs_returned, 0);
+	session->pid = _mali_osk_get_pid();
 #endif
 
 	MALI_CORE_SUBSYSTEM_MUTEX_RELEASE(subsystem);
@@ -1473,10 +1480,10 @@ _mali_osk_errcode_t mali_core_session_add_job(mali_core_session * session, mali_
 	mali_core_subsystem * subsystem;
 
 	job->magic_nr = JOB_MAGIC_NR;
-	MALI_CHECK_SESSION(session);
+	MALI_CHECK_SESSION_RETURN(session);
 
 	subsystem = session->subsystem;
-	MALI_CHECK_SUBSYSTEM(subsystem);
+	MALI_CHECK_SUBSYSTEM_RETURN(subsystem);
 	MALI_ASSERT_MUTEX_IS_GRABBED(subsystem);
 
 	MALI_DEBUG_PRINT(5, ("Core: session_add_job: for %s\n", subsystem->name )) ;
@@ -1545,11 +1552,11 @@ static void mali_core_renderunit_detach_job_from_core(mali_core_renderunit* core
 	MALI_DEBUG_ASSERT(CORE_IDLE != core->state);
 
 	/* The reset_core() called some lines below might call this detach
-	 * funtion again. To protect the core object from being modified by
+	 * funtion again. To protect the core object from being modified by 
 	 * recursive calls, the in_detach_function would track if it is an recursive call
 	 */
 	already_in_detach_function = core->in_detach_function;
-
+	
 	if ( MALI_FALSE == already_in_detach_function )
 	{
 		core->in_detach_function = MALI_TRUE;

@@ -25,6 +25,7 @@
 #include <asm/cacheflush.h>
 #include "ump_kernel_common.h"
 #include "ump_kernel_memory_backend.h"
+#include "mali_kernel_common.h"
 
 
 
@@ -117,7 +118,7 @@ static int os_allocate(void* ctx, ump_dd_mem * descriptor)
 
 	if (down_interruptible(&info->mutex))
 	{
-		DBG_MSG(1, ("Failed to get mutex in os_free\n"));
+		MSG_ERR(("Failed to get mutex in os_free\n"));
 		return 0; /* failure */
 	}
 
@@ -130,7 +131,7 @@ static int os_allocate(void* ctx, ump_dd_mem * descriptor)
 	if (NULL == descriptor->block_array)
 	{
 		up(&info->mutex);
-		DBG_MSG(1, ("Block array could not be allocated\n"));
+		MSG_ERR(("Block array could not be allocated\n"));
 		return 0; /* failure */
 	}
 
@@ -147,6 +148,7 @@ static int os_allocate(void* ctx, ump_dd_mem * descriptor)
 		}
 		if (NULL == new_page)
 		{
+			MSG_ERR(("Failed to alloc_page, NULL == new_page\n"));
 			break;
 		}
 
@@ -179,7 +181,7 @@ static int os_allocate(void* ctx, ump_dd_mem * descriptor)
 
 	if (left)
 	{
-		DBG_MSG(1, ("Failed to allocate needed pages\n"));
+		MSG_ERR(("Failed to allocate needed pages\n"));
 
 		while(pages_allocated)
 		{
@@ -223,7 +225,7 @@ static void os_free(void* ctx, ump_dd_mem * descriptor)
 
 	if (down_interruptible(&info->mutex))
 	{
-		DBG_MSG(1, ("Failed to get mutex in os_free\n"));
+		MSG_ERR(("Failed to get mutex in os_free\n"));
 		return;
 	}
 

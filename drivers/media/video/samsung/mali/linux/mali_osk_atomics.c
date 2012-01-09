@@ -29,6 +29,7 @@ u32 _mali_osk_atomic_dec_return( _mali_osk_atomic_t *atom )
 
 void _mali_osk_atomic_inc( _mali_osk_atomic_t *atom )
 {
+    if( (atom) == NULL ) return;
     atomic_inc((atomic_t *)&atom->u.val);
 }
 

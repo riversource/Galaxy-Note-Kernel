@@ -42,7 +42,7 @@ SCHED_FEAT(LAST_BUDDY, 1)
  * Consider buddies to be cache hot, decreases the likelyness of a
  * cache buddy being migrated away, increases cache locality.
  */
-SCHED_FEAT(CACHE_HOT_BUDDY, 1)
+SCHED_FEAT(CACHE_HOT_BUDDY, 0)
 
 /*
  * Use arch dependent cpu power functions

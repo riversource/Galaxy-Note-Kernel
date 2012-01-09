@@ -41,25 +41,13 @@
 
 #define CPUMON 0
 
-#ifdef CONFIG_BATTERY
-#define CHECK_DELAY	1 << 8
+#define CHECK_DELAY	HZ
 #define TRANS_LOAD_L	20
-#define TRANS_LOAD_H	70
-#define TRANS_LOAD_L_SCREEN_OFF 40
+#define TRANS_LOAD_H	70 //(TRANS_LOAD_L*3)
+#define TRANS_LOAD_L_SCREEN_OFF 45
 #define TRANS_LOAD_H_SCREEN_OFF 90
-#else
-#define CHECK_DELAY	(HZ >> 1)
-#define TRANS_LOAD_L	20
-#define TRANS_LOAD_H	(TRANS_LOAD_L*3)
-#define TRANS_LOAD_L_SCREEN_OFF 30
-#define TRANS_LOAD_H_SCREEN_OFF 80
-#endif
 
-#ifdef CONFIG_BATTERY
 #define CPU1_ON_FREQ 1 << 19
-#else
-#define CPU1_ON_FREQ 1 << 18
-#endif
 
 #define printk(arg...)
 
@@ -71,7 +59,14 @@ static struct workqueue_struct *hotplug_wq;
 static struct delayed_work hotplug_work;
 
 static unsigned int hotpluging_rate = CHECK_DELAY;
-module_param_named(rate, hotpluging_rate, uint, 0644);
+static unsigned int check_rate = CHECK_DELAY;
+module_param_named(rate, check_rate, uint, 0644);
+static unsigned int check_rate_cpuon = CHECK_DELAY << 1;
+module_param_named(rate_cpuon, check_rate_cpuon, uint, 0644);
+static unsigned int check_rate_scroff = CHECK_DELAY << 2;
+module_param_named(rate_scroff, check_rate_scroff, uint, 0644);
+static unsigned int freq_cpu1on = CPU1_ON_FREQ;
+module_param_named(freq_cpu1on, freq_cpu1on, uint, 0644);
 static unsigned int user_lock;
 module_param_named(lock, user_lock, uint, 0644);
 static unsigned int trans_load_l = TRANS_LOAD_L;
@@ -151,7 +146,7 @@ static void hotplug_timer(struct work_struct *work)
 
 	if ( ( 
 		  (avg_load < (screen_off ? trans_load_l_off : trans_load_l)) ||
-		  (cur_freq < CPU1_ON_FREQ )
+		  (cur_freq <= freq_cpu1on )
 		 )
 		&& cpu_online(1) ) {
 		printk("cpu1 turning off!\n");
@@ -160,10 +155,11 @@ static void hotplug_timer(struct work_struct *work)
 		printk(KERN_ERR "CPUMON D %d\n", avg_load);
 #endif
 		printk("cpu1 off end!\n");
-		if(!screen_off) hotpluging_rate = CHECK_DELAY;
+		if(!screen_off) hotpluging_rate = check_rate;
+		else hotpluging_rate = check_rate_scroff;
 	} else if ( (
 			(avg_load > (screen_off ? trans_load_h_off : trans_load_h)) &&
-			(cur_freq > CPU1_ON_FREQ )
+			(cur_freq > freq_cpu1on )
 				) 
 		&& !cpu_online(1) ) {
 		printk("cpu1 turning on!\n");
@@ -172,11 +168,7 @@ static void hotplug_timer(struct work_struct *work)
 		printk(KERN_ERR "CPUMON U %d\n", avg_load);
 #endif
 		printk("cpu1 on end!\n");
-#ifndef CONFIG_SIYAH_SAFE_FEATURES
-		if(!screen_off) hotpluging_rate = CHECK_DELAY << 1;
-#else
-		hotpluging_rate = CHECK_DELAY * 4;
-#endif
+		hotpluging_rate = check_rate_cpuon;
 	}
 no_hotplug:
 
@@ -235,9 +227,7 @@ static void hotplug_early_suspend(struct early_suspend *handler)
 {
 	mutex_lock(&hotplug_lock);
 	screen_off = true;
-#ifdef CONFIG_BATTERY
-	hotpluging_rate = CHECK_DELAY << 2;
-#endif
+	hotpluging_rate = check_rate_scroff;
 	mutex_unlock(&hotplug_lock);
 }
 
@@ -247,9 +237,7 @@ static void hotplug_late_resume(struct early_suspend *handler)
 
 	mutex_lock(&hotplug_lock);
 	screen_off = false;
-#ifdef CONFIG_BATTERY
-	hotpluging_rate = CHECK_DELAY << 1;
-#endif
+	hotpluging_rate = check_rate;
 	//cpu_up(1); //when the screen is on, activate the second cpu no matter what the load is
 	queue_delayed_work_on(0, hotplug_wq, &hotplug_work, hotpluging_rate);
 	mutex_unlock(&hotplug_lock);
@@ -296,7 +284,7 @@ declare_store(hotplug_on) {
 	if (!hotplug_on && strcmp(buf, "on\n") == 0) {
 		hotplug_on = 1;
 		// restart worker thread.
-		hotpluging_rate = CHECK_DELAY;
+		hotpluging_rate = check_rate;
 		queue_delayed_work_on(0, hotplug_wq, &hotplug_work, hotpluging_rate);
 		printk("second_core: hotplug is on!\n");
 	}

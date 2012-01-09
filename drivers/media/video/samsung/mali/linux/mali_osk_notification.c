@@ -15,6 +15,7 @@
 
 #include "mali_osk.h"
 #include "mali_kernel_common.h"
+#include <mali_uk_types.h>
 
 /* needed to detect kernel version specific code */
 #include <linux/version.h>
@@ -27,6 +28,8 @@
 #else /* pre 2.6.26 the file was in the arch specific location */
 #include <asm/semaphore.h>
 #endif
+
+#define MALI_PMM_NOTIFICATION_TYPE	0
 
 /**
  * Declaration of the notification queue object type
@@ -66,7 +69,7 @@ _mali_osk_notification_t *_mali_osk_notification_create( u32 type, u32 size )
 	/* OPT Recycling of notification objects */
     _mali_osk_notification_wrapper_t *notification;
 
-	notification = (_mali_osk_notification_wrapper_t *)kmalloc( sizeof(_mali_osk_notification_wrapper_t), GFP_KERNEL );
+	notification = (_mali_osk_notification_wrapper_t *)kmalloc( sizeof(_mali_osk_notification_wrapper_t) + size, GFP_KERNEL );
     if (NULL == notification)
     {
 		MALI_DEBUG_PRINT(1, ("Failed to create a notification object\n"));
@@ -76,21 +79,13 @@ _mali_osk_notification_t *_mali_osk_notification_create( u32 type, u32 size )
 	/* Init the list */
 	INIT_LIST_HEAD(&notification->list);
 
-	/* allocate memory for the buffer requested */
 	if (0 != size)
 	{
-		notification->data.result_buffer = kmalloc( size, GFP_KERNEL );
-		if ( NULL == notification->data.result_buffer )
-		{
-			/* failed to buffer, cleanup */
-			MALI_DEBUG_PRINT(1, ("Failed to allocate memory for notification object buffer of size %d\n", size));
-			kfree(notification);
-			return NULL;
-		}
+		notification->data.result_buffer = ((u8*)notification) + sizeof(_mali_osk_notification_wrapper_t);
 	}
 	else
 	{
-		notification->data.result_buffer  = 0;
+		notification->data.result_buffer = NULL;
 	}
 
 	/* set up the non-allocating fields */
@@ -106,12 +101,27 @@ void _mali_osk_notification_delete( _mali_osk_notification_t *object )
 	_mali_osk_notification_wrapper_t *notification;
 	MALI_DEBUG_ASSERT_POINTER( object );
 
-    notification = container_of( object, _mali_osk_notification_wrapper_t, data );
+        if ((u32)object & 0x3)
+        {
+                MALI_PRINT(("warning : notification object is wrong\n"));
+                return;
+        }
+
+        if (object->notification_type!=MALI_PMM_NOTIFICATION_TYPE &&
+            object->notification_type!=_MALI_NOTIFICATION_CORE_SHUTDOWN_IN_PROGRESS &&
+            object->notification_type!=_MALI_NOTIFICATION_APPLICATION_QUIT &&
+            object->notification_type!=_MALI_NOTIFICATION_PP_FINISHED &&
+            object->notification_type!=_MALI_NOTIFICATION_GP_FINISHED &&
+            object->notification_type!=_MALI_NOTIFICATION_GP_STALLED)
+        {
+                MALI_PRINT(("warning : notification type is wrong, notification_type = %x\n", object->notification_type));
+                return;
+        }
+
+	notification = container_of( object, _mali_osk_notification_wrapper_t, data );
 
 	/* Remove from the list */
 	list_del(&notification->list);
-	/* Free the buffer */
-	kfree(notification->data.result_buffer);
 	/* Free the container */
 	kfree(notification);
 }
