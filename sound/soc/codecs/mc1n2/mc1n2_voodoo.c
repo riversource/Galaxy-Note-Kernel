@@ -22,7 +22,7 @@ static struct mc1n2_voodoo *mc1n2;
 static ssize_t version_show(struct class *class, struct class_attribute *attr,
 			    char *buf)
 {
-	return sprintf(buf, "%d\n", VERSION);
+	return sprintf(buf, "%s\n", VERSION);
 }
 
 static CLASS_ATTR(version, 0444, version_show, NULL);
@@ -96,7 +96,6 @@ static ssize_t vol_hpgain_store(struct class *class,
 		map = (volmap) vol_hpgain_addr;
 		vol_store(map, HPGAIN_SIZE, buf);
 	}
-	count = (size_t) buf;
 
 	return count;
 }
@@ -168,6 +167,7 @@ void __exit mc1n2_voodoo_exit(void)
 MODULE_DESCRIPTION(NAME);
 MODULE_AUTHOR("supercurio");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(VERSION);
 
 module_init(mc1n2_voodoo_init);
 module_exit(mc1n2_voodoo_exit);

@@ -1,5 +1,5 @@
 #define NAME					   "Voodoo Yamaha MC1-N2 driver"
-#define VERSION								       1
+#define VERSION								     "1"
 #define HPGAIN_SIZE							       4
 #define HPSP_SIZE							      32
 
