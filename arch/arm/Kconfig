@@ -1158,6 +1158,16 @@ config ARM_ERRATA_753970
 	  This has the same effect as the cache sync operation: store buffer
 	  drain and waiting for all buffers empty.
 
+config ARM_ERRATA_754322
+	bool "ARM errata: possible faulty MMU translations following on ASID switch"
+	depends on CPU_V7
+	help
+
+config ARM_ERRATA_754327
+	bool "ARM errata: no automatic Store Buffer drain"
+	depends on CPU_V7 && SMP
+	help
+
 endmenu
 
 source "arch/arm/common/Kconfig"
@@ -1220,6 +1230,11 @@ config PCI_HOST_ITE8152
 source "drivers/pci/Kconfig"
 
 source "drivers/pcmcia/Kconfig"
+
+config ARM_ERRATA_764369
+	bool "ARM errata: Data cache line maintenance operation by MVA may not succeed"
+	depends on CPU_V7 && SMP
+	help
 
 endmenu
 
@@ -1534,6 +1549,16 @@ config ALIGNMENT_TRAP
 	  here, which has a severe performance impact. This is necessary for
 	  correct operation of some network protocols. With an IP-only
 	  configuration it is safe to say N, otherwise say Y.
+
+config ALLOW_CPU_ALIGNMENT
+	bool "Allow CPU-based alignment handling"
+	default y if ARCH_MSM_SCORPION || ARCH_MSM_SCORPIONMP
+	help
+	  Advanced ARM processors, such as the Cortex series and ARMv7-based
+	  CPUS are capable of performing unaligned accesses for many types of
+	  memory accesses.  Typically, using a cpu-based alignment fixup is
+	  faster than doing such a fixup in software.  For best performance
+	  on advanced CPUs, say Y here.
 
 config UACCESS_WITH_MEMCPY
 	bool "Use kernel mem{cpy,set}() for {copy_to,clear}_user() (EXPERIMENTAL)"

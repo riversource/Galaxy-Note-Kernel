@@ -52,6 +52,7 @@
 
 #include <plat/gpio-cfg.h>
 #include <mach/gpio.h>
+#include <mach/cpufreq.h>
 
 #ifdef CONFIG_SND_SOC_MIC_A1026
 
@@ -202,6 +203,7 @@ struct mc1n2_info_store mc1n2_info_store_tbl[] = {
 #define MC1N2_N_INFO_STORE (sizeof(mc1n2_info_store_tbl) / sizeof(struct mc1n2_info_store))
 
 int isVoiceSearch = 0;
+static int mc1n2_freq_lock = 0;
 
 static void mc1n2_set_codec_data(struct snd_soc_codec *codec)
 {
@@ -1292,6 +1294,21 @@ static int write_reg_vol(struct snd_soc_codec *codec,
 	return 0;
 }
 
+static ssize_t mc1n2_show_freq_lock(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf,"%d\n", mc1n2_freq_lock);
+}
+
+static ssize_t mc1n2_store_freq_lock(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+	int data;
+	if (sscanf(buf, "%d\n", &data) > 0) {
+		mc1n2_freq_lock = data;
+	}
+	return size;
+}
+
+static DEVICE_ATTR(freq_lock, S_IRUGO | S_IWUSR | S_IWGRP, mc1n2_show_freq_lock, mc1n2_store_freq_lock);
 static int mc1n2_hwdep_ioctl_set_path(struct snd_soc_codec *codec,
 				      void *info, unsigned int update);
 
@@ -3588,8 +3605,14 @@ static int mc1n2_hwdep_ioctl_notify(struct snd_soc_codec *codec,
 		mc1n2->pdata->set_adc_power_contraints(1);
 		break;
 	case MCDRV_NOTIFY_MEDIA_PLAY_START:
+#ifdef CONFIG_S5PV310_HI_ARMCLK_THAN_1_2GHZ
+#else
+		if (mc1n2_freq_lock)
+			s5pv310_cpufreq_lock(DVFS_LOCK_ID_SND, CPU_L9); // CPU CLK lower lock 100MHz
+#endif
 		break;
 	case MCDRV_NOTIFY_MEDIA_PLAY_STOP:
+		s5pv310_cpufreq_lock_free(DVFS_LOCK_ID_SND);
 		break;
 	case MCDRV_NOTIFY_FM_PLAY_START:
 		mc1n2_current_mode |= MC1N2_MODE_FM_ON;

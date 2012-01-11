@@ -73,9 +73,9 @@ mali_dvfs_staycount_table mali_dvfs_staycount[MALI_DVFS_STEPS]={
 /*dvfs threshold*/
 mali_dvfs_threshold_table mali_dvfs_threshold[MALI_DVFS_STEPS]={
 #if 1
-		/*step 0*/{((int)((255*0)/100))   ,((int)((255*65)/100))},
-		/*step 1*/{((int)((255*30)/100))  ,((int)((255*100)/100))},
-		/*step 2*/{((int)((255*20)/100))  ,((int)((255*100)/100))} };
+		/*step 0*/{((int)((255*0)/100))   ,((int)((255*85)/100))},
+		/*step 1*/{((int)((255*65)/100))  ,((int)((255*100)/100))},
+		/*step 2*/{((int)((255*98)/100))  ,((int)((255*100)/100))} };
 #else
 		/*step 0*/{((int)((255*0)/100))   ,((int)((255*82)/100))},
 		/*step 1*/{((int)((255*75)/100))  ,((int)((255*95)/100))},
@@ -89,11 +89,11 @@ int mali_dvfs_control=0;
 /*dvfs table*/
 mali_dvfs_table mali_dvfs[MALI_DVFS_STEPS]={
 #ifdef CONFIG_S5PV310_ASV
-			/*step 0*/{100  ,1000000    , 950000},
+			/*step 0*/{160  ,1000000    , 950000},
 			/*step 1*/{267  ,1000000    ,1000000},
 			/*step 2*/{300  ,1000000    ,1100000} };
 #else
-			/*step 0*/{100  ,1000000    , 950000},
+			/*step 0*/{160  ,1000000    , 950000},
 			/*step 1*/{267  ,1000000    ,1000000},
 			/*step 2*/{300  ,1000000    ,1100000} };
 #endif

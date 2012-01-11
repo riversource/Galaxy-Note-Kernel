@@ -154,6 +154,29 @@
 	.long	9999b,9001f;			\
 	.popsection
 
+#ifdef CONFIG_SMP
+#define ALT_SMP(instr...)			\
+9998:	instr
+#define ALT_UP(instr...)			\
+	.pushsection ".alt.smp.init", "a"	;\
+	.long	9998b				;\
+9997:	instr					;\
+	.if .	- 9997b != 4			;\
+		  .error "ALT_UP() content must assemble to exactly 4 bytes"	;\
+	.endif					;\
+	.popsection
+#define ALT_UP_B(label)			\
+	.equ	up_b_offset, label - 9998b	;\
+	.pushsection ".alt.smp.init", "a"	;\
+	.long	9998b				;\
+	W(b)	. + up_b_offset			;\
+	.popsection
+#else
+#define ALT_SMP(instr...)
+#define ALT_UP(instr...) instr
+#define ALT_UP_B(label) b label
+#endif
+
 /*
  * SMP data memory barrier
  */
