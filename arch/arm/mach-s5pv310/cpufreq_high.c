@@ -121,7 +121,7 @@ enum cpufreq_level_index{
 
 //don't ask me why we have another table. this is just an easy solution
 static unsigned int abyss_freq_table[] = {
-	1704,1600,1400,1200,1000,800,500,200,100,50
+	1704,1664,1600,1400,1200,1000,800,500,200,100
 };
 
 static unsigned int freq_trans_table[CPUFREQ_LEVEL_END][CPUFREQ_LEVEL_END] = {
@@ -161,15 +161,15 @@ static unsigned int freq_trans_table[CPUFREQ_LEVEL_END][CPUFREQ_LEVEL_END] = {
 #ifdef CONFIG_CPU_S5PV310_EVT1
 static struct cpufreq_frequency_table s5pv310_freq_table[] = {
 	{L0, 1704*1000},
-	{L1, 1600*1000},
-	{L2, 1400*1000},
-	{L3, 1200*1000},
-	{L4, 1000*1000},
-	{L5, 800*1000},
-	{L6, 500*1000},
-	{L7, 200*1000},
-	{L8, 100*1000},
-	{L9, 50*1000},
+	{L1, 1664*1000},
+	{L2, 1600*1000},
+	{L3, 1400*1000},
+	{L4, 1200*1000},
+	{L5, 1000*1000},
+	{L6, 800*1000},
+	{L7, 500*1000},
+	{L8, 200*1000},
+	{L9, 100*1000},
 	{0, CPUFREQ_TABLE_END},
 };
 #else
@@ -2467,31 +2467,31 @@ static void s5pv310_asv_set_voltage(void)
 	freqs.old = s5pv310_getspeed(0);
 
 	switch (freqs.old) {
-	case 50000:
+	case 100000:
 		asv_arm_index = 9;
 		break;
-	case 100000:
+	case 200000:
 		asv_arm_index = 8;
 		break;
-	case 200000:
+	case 500000:
 		asv_arm_index = 7;
 		break;
-	case 500000:
+	case 800000:
 		asv_arm_index = 6;
 		break;
-	case 800000:
+	case 1000000:
 		asv_arm_index = 5;
 		break;
-	case 1000000:
+	case 1200000:
 		asv_arm_index = 4;
 		break;
-	case 1200000:
+	case 1400000:
 		asv_arm_index = 3;
 		break;
-	case 1400000:
+	case 1600000:
 		asv_arm_index = 2;
 		break;
-	case 1600000:
+	case 1664000:
 		asv_arm_index = 1;
 		break;
 	case 1704000:
@@ -2887,61 +2887,61 @@ ssize_t set_freq_table(unsigned char step, unsigned int freq)
 	switch(step)
 	{
 		case 0: //1704
-			if(freq > 1796 || freq <= 1600) return -EINVAL;
+			if(freq > 1796 || freq <= 1664) return -EINVAL;
 			pll = (int)(freq / 8);
 			s5pv310_apll_pms_table[step] =	((pll<<16)|(3<<8)|(0x1));
 			s5pv310_freq_table[step].frequency = pll * 8 * 1000;	
 			break;
-		case 1: //1600
-			if(freq > 1696 || freq <= 1400) return -EINVAL;
+		case 1: //1664
+			if(freq >= 1704 || freq <= 1600) return -EINVAL;
 			pll = (int)(freq / 8);
 			s5pv310_apll_pms_table[step] =	((pll<<16)|(3<<8)|(0x1));
 			s5pv310_freq_table[step].frequency = pll * 8 * 1000;	
 			break;
-		case 2: //1400
+		case 2: //1600
+			if(freq >= 1664 || freq <= 1400) return -EINVAL;
+			pll = (int)(freq / 8);
+			s5pv310_apll_pms_table[step] =	((pll<<16)|(3<<8)|(0x1));
+			s5pv310_freq_table[step].frequency = pll * 8 * 1000;	
+			break;
+		case 3: //1400
 			if(freq >= 1600 || freq <= 1200) return -EINVAL;
 			pll = (int)(freq / 8);
 			s5pv310_apll_pms_table[step] =	((pll<<16)|(3<<8)|(0x1));
 			s5pv310_freq_table[step].frequency = pll * 8 * 1000;	
 			break;
-		case 3: //1200
+		case 4: //1200
 			if(freq >= 1400 || freq <= 1000) return -EINVAL;
 			pll = (int)(freq / 8);
 			s5pv310_apll_pms_table[step] =	((pll<<16)|(3<<8)|(0x1));
 			s5pv310_freq_table[step].frequency = pll * 8 * 1000;	
 			break;
-		case 4: //1000
+		case 5: //1000
 			if(freq >= 1200 || freq <=  800) return -EINVAL;
 			pll = (int)(freq / 4);
 			s5pv310_apll_pms_table[step] =	((pll<<16)|(6<<8)|(0x1));
 			s5pv310_freq_table[step].frequency = pll * 4 * 1000;	
 			break;
-		case 5: //800
+		case 6: //800
 			if(freq >= 1000 || freq <  500) return -EINVAL;
 			pll = (int)(freq / 4);
 			s5pv310_apll_pms_table[step] =	((pll<<16)|(6<<8)|(0x1));
 			s5pv310_freq_table[step].frequency = pll * 4 * 1000;	
 			break;
-		case 6: //500
+		case 7: //500
 			if(freq >=  800 || freq <=  200) return -EINVAL;
 			pll = (int)(freq / 2);
 			s5pv310_apll_pms_table[step] =	((pll<<16)|(6<<8)|(0x2));
 			s5pv310_freq_table[step].frequency = pll * 2 * 1000;	
 			break;
-		case 7: //200
+		case 8: //200
 			if(freq >=  500 || freq <=  100) return -EINVAL;
 			pll = (int)(freq / 1);
 			s5pv310_apll_pms_table[step] =	((pll<<16)|(6<<8)|(0x3));
 			s5pv310_freq_table[step].frequency = pll * 1 * 1000;	
 			break;
-		case 8: //100
-			if(freq >   200 || freq <   50) return -EINVAL;
-			pll = (int)(freq * 2);
-			s5pv310_apll_pms_table[step] =	((pll<<16)|(6<<8)|(0x4));
-			s5pv310_freq_table[step].frequency = pll * 500;	
-			break;
-		case 9: //50
-			if(freq >   100 || freq <   25) return -EINVAL;
+		case 9: //100
+			if(freq >   200 || freq <   25) return -EINVAL;
 			pll = (int)(freq * 2);
 			s5pv310_apll_pms_table[step] =	((pll<<16)|(6<<8)|(0x4));
 			s5pv310_freq_table[step].frequency = pll * 500;	

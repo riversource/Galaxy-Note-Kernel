@@ -30,15 +30,15 @@ enum cpufreq_level_request{
 #else
 enum cpufreq_level_request{
 	CPU_L0,		/* 1.704GHz */
-	CPU_L1, 	/* 1.6GHz */
-	CPU_L2,		/* 1.4GHz */
-	CPU_L3,		/* 1.2GHz */
-	CPU_L4,		/* 1GHz */
-	CPU_L5, 	/* 800MHz */
-	CPU_L6, 	/* 500MHz */
-	CPU_L7, 	/* 200MHz */
-	CPU_L8, 	/* 100MHz */
-	CPU_L9, 	/* 50MHz */
+	CPU_L1, 	/* 1.664GHz */
+	CPU_L2,		/* 1.6GHz */
+	CPU_L3,		/* 1.4GHz */
+	CPU_L4,		/* 1.2GHz */
+	CPU_L5, 	/* 1GHz */
+	CPU_L6, 	/* 800MHz */
+	CPU_L7, 	/* 500MHz */
+	CPU_L8, 	/* 200MHz */
+	CPU_L9, 	/* 100MHz */
 	CPU_LEVEL_END,
 };
 #endif
